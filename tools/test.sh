@@ -99,7 +99,7 @@ fi
 if [ "${ARM:-0}" = 1 ]; then
   ZIG="${ZIG:-python3 -m ziglang}"
   $ZIG c++ -target arm-linux-gnueabihf.2.36 -mcpu=cortex_a17 -O2 -std=c++20 -w tools/plugin_test.cpp -o "$T/plugin_test_arm" -ldl -lpthread 2>/dev/null
-  run plugin_test_arm env QEMU_LD_PREFIX=/usr/arm-linux-gnueabihf MPCNAM_EXPECT_NO_CURL=1 qemu-arm "$T/plugin_test_arm" "$R/vst/build/liminal_amp.so" \
+  run plugin_test_arm env QEMU_LD_PREFIX=/usr/arm-linux-gnueabihf MPCNAM_EXPECT_NO_CURL=1 MPCNAM_T3K_PORT=18094 MPCNAM_T3K_HOST=127.0.0.1 qemu-arm "$T/plugin_test_arm" "$R/vst/build/liminal_amp.so" \
       "$IN/a2_slimmable.nam" "$IN/a2_3.nam" "$IN/ir_long.wav" "$IN/ir_short.wav"
 fi
 exit $fail
