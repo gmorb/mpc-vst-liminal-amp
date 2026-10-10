@@ -1,0 +1,11 @@
+{
+  "name": "Liminal Amp",
+  "vendor": "Gm0rb",
+  "uid": "NmA2",
+  "version": 100,
+  "so": "liminal_amp.so",
+  "params": "params.json",
+  "layout": "layout.conf",
+  "about": "Neural Amp Modeler A2 amp captures (Lite size) with a cabinet IR, noise gate and tone stack; browses .nam and .wav files in models/ and irs/ folders anywhere on the device's drives.",
+  "art": "html"
+}
