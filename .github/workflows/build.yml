@@ -9,8 +9,9 @@ on:
   workflow_dispatch:
 
 env:
-  MPC_VST_REPO: sd88me/mpc-vst-plugins          # page generator, plugin-list entry, catalog tools
+  MPC_VST_REPO: sd88me/mpc-vst-plugins          # page generator and plugin-list entry (pinned: the page tested on a device)
   MPC_VST_REF: 3e50b052268d81e6c61a17a1390ced62f0fdff74
+  MPC_VST_RELEASE_REF: 7c4bf25dd9947eba3f1bf2d8b176bafdcd6a2ae0   # release.py + catalog_check.py: Gen 2 (aarch64) zips
 
 jobs:
   build:
@@ -24,10 +25,15 @@ jobs:
           repository: ${{ env.MPC_VST_REPO }}
           ref: ${{ env.MPC_VST_REF }}
           path: mpc-vst-plugins
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.MPC_VST_REPO }}
+          ref: ${{ env.MPC_VST_RELEASE_REF }}
+          path: mpc-vst-plugins-release
       - name: Tools
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q libeigen3-dev libcurl4-openssl-dev curl qemu-user libc6-armhf-cross zip
+          sudo apt-get install -y -q libeigen3-dev libcurl4-openssl-dev curl qemu-user libc6-armhf-cross libc6-arm64-cross zip
           pip install --break-system-packages ziglang==0.16.0 pillow
           pip install --break-system-packages playwright   # the page's browser renderer (vst.json "art": "html")
           python3 -m playwright install --with-deps chromium
@@ -58,11 +64,17 @@ jobs:
         env:
           MPC_VST: ${{ github.workspace }}/mpc-vst-plugins
         run: vst/build.sh host && ARM=1 tools/test.sh
-      - name: Package (distribution zip + catalog zip, checked by catalog_check.py)
+      - name: Build and test Gen 2 (aarch64, under qemu-aarch64)
         working-directory: mpc-vst-liminal-amp
         env:
           MPC_VST: ${{ github.workspace }}/mpc-vst-plugins
-        run: vst/build.sh && tools/package.sh
+        run: vst/build.sh aarch64 && vst/build.sh host && ARM64=1 tools/test.sh
+      - name: Package (distribution zip, catalog zips for Gen 1 and Gen 2, checked by catalog_check.py)
+        working-directory: mpc-vst-liminal-amp
+        env:
+          MPC_VST: ${{ github.workspace }}/mpc-vst-plugins
+          MPC_VST_RELEASE: ${{ github.workspace }}/mpc-vst-plugins-release
+        run: vst/build.sh && vst/build.sh aarch64 && tools/package.sh
       - name: Tag matches VERSION
         if: startsWith(github.ref, 'refs/tags/v')
         working-directory: mpc-vst-liminal-amp
