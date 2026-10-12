@@ -168,6 +168,10 @@ Other firmware and the details: the release's README. The release also has a cat
 (`Liminal-Amp-<version>-mpc-armv7.zip`, with `install.sh`) for the MPC OS Plugin Catalog; use one method per device.
 Your `models`, `irs` and `presets` folders are kept across upgrades.
 
+**Gen 2 devices (MPC Live III and kin, RK3588 / RK3588S):** the release also has a 64-bit build,
+`Liminal-Amp-<version>-mpc-aarch64.zip` (the catalog's installer picks it on a Gen 2 device). Tested under emulation
+only so far: see [docs/GEN2.md](docs/GEN2.md).
+
 ### Want more?
 For a fuller amp rig, see [**NAM** by jacob-sabella](https://github.com/jacob-sabella/mpc-vst-nam), also in the
 MPC OS Plugin Catalog: favorites and recents, pitch, delay and reverb, and its own TONE3000 browser on the MPC's

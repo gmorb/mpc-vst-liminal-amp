@@ -433,3 +433,53 @@ docs don't say so; this answers the open item). User chose "LiminalStack": vst.j
 doesn't match it). Unchanged: product/catalog name "Liminal Stack", catalog id, repo, liminal_stack.so, uid NmA2, state and preset headers.
 User's own test projects need the plugin re-inserted (folder name changed). All 11 tests pass; device build + catalog_check OK.
 
+
+## 2026-10-10 (afternoon): CI's ARM run
+CI failed 4 checks in plugin_test_arm (NAME ON PHONE / edit page / Save and load / A2 FULL from a preset). Cause: tools/test.sh ran the
+ARM (qemu) plugin_test without MPCNAM_T3K_PORT=18094 and MPCNAM_T3K_HOST=127.0.0.1, which the PC run sets; the My Presets phone tests
+(added after the last ARM run) talk to 127.0.0.1:18094, so the page opened on 8091 at the LAN address and the rest followed. Not a
+network problem (qemu-user shares the host's network). Fixed in test.sh only; ARM=1 tools/test.sh: all 12 programs pass.
+
+## 2026-10-10 (evening): 1.0.1, the CPU bench and tested.json
+The catalog listing asked for a CPU figure (docs/BENCH.md in the kit) and a tested.json entry.
+- **The kit's bench is unsafe for this plugin as is**: its sweep stage sets random values on ALL 80 parameters, which includes
+  DELETE (two taps delete the selected file permanently), My Presets SAVE/DELETE, RESCAN and A2 Full. A dry run on copies deleted
+  7 of 12 files and wrote 4 presets. And short stages measure before the capture loads (the bench outruns real time).
+  `tools/bench_device.sh <ip> [secs=60]` runs the kit's bench.c, unmodified, on the device in /tmp/la-bench with COPIES of one
+  capture and one IR (MPCNAM_MEDIA / _PRESETS / _T3K_DEST pointed there), removes it after, and writes bench/bench-<VERSION>.json.
+  SO_FILE= picks the .so (e.g. CI's), BENCH_BIN= a prebuilt bench (Zig builds it otherwise). LOCAL=1 is a dry run on the PC.
+- **Found and fixed (1.0.1)**: GET TONES / BROWSE TONE3000 / NAME ON PHONE started the phone server inside setParameter
+  (socket, thread, dlopen libcurl: 4-6 ms on x86), which the bench counted as a 156-437% block. Now queued (phone_req) and
+  started by the worker. Sweep worst block on x86: 7.5-16.6% (PASS). Tests adjusted to wait for the page; all 11 + TSan pass.
+- tools/package.sh uses bench/bench-<VERSION>.json when it exists (or BENCH=), so commit it before tagging and CI's release
+  records the figure. tested.json (repo root) is read by the catalog from the default branch.
+- VERSION 1.0.1 (vst.json 101). Not yet benched on the device or released.
+
+## 2026-10-10 (night): Gen 2 (aarch64) build
+- `vst/build.sh aarch64` -> vst/build/aarch64/liminal_amp.so (Zig aarch64-linux-gnu.2.17, -mcpu=cortex_a55, -DPFFFT_ENABLE_NEON);
+  exports only VSTPluginMain, glibc <= 2.17, needs libc/libm/libpthread/libdl. `ARM64=1 tools/test.sh`: plugin_test_a64 and
+  ir_test_a64 under qemu-aarch64 (needs libc6-arm64-cross): PASS (FFT vs official direct convolution within 2.6e-6).
+- tools/package.sh writes dist/Liminal-Amp-for-MPC-OS-<v>-aarch64.zip when the aarch64 .so exists (no bench figure in it).
+  tools/bench_device.sh picks an aarch64 bench for an aarch64 SO_FILE and writes bench/bench-<v>-aarch64.json.
+  docs/GEN2.md: probe first (tools/probe_device.sh: MPC binary 64-bit? settings key), manual install, bench, report.
+- **Found: PFFFT runs scalar in the Gen 1 (armhf) build too.** PFFFT only uses NEON with PFFFT_ENABLE_NEON, which
+  build.sh never set, so SIMD_SZ is 1 on armhf; docs that say "PFFFT with NEON" were wrong. The Force measurements (cab IR
+  ~3% of a block) are of that scalar build. Enabling it for armhf is a one-flag change (`-DPFFFT_ENABLE_NEON` in the device
+  build) that would make the cab cheaper; it needs ir_test under ARM=1 and a new device bench. Not done: not asked.
+- Not tested on a Gen 2 device. Unknown: whether Gen 2's MPC is 64-bit, its plugin-list key, and vstscanner on Gen 2.
+
+## 2026-10-10 (late night): Gen 2 the kit's way
+User asked to follow sd88me/mpc-vst-plugins for Gen 2. The kit (HEAD 7c4bf25, 148 commits past our 3e50b05 pin) has docs/GEN2.md:
+Gen 2 MPC is 64-bit, no 32-bit libs; release.py names `<Name>-<v>-mpc-aarch64.zip` from the ELF and writes arch into the manifest;
+both zips on one release; the catalog finds the aarch64 zip by swapping armv7 for aarch64 in asset_pattern (no second entry);
+install.sh refuses on a uname mismatch and registers aarch64 into `pluginList-arm-64bit` (confirmed on an MPC Live III, MPC OS 5.0.18,
+with Crate Digger and Profit-08, 2026-10-11); aarch64 glibc ceiling 2.39; tested.json device must contain "Gen2".
+- Replaced my hand-made `Liminal-Amp-for-MPC-OS-<v>-aarch64.zip` with that: tools/package.sh runs MPC_VST_RELEASE's release.py
+  again with vst/build/aarch64/liminal_amp.so -> dist/Liminal-Amp-<v>-mpc-aarch64.zip, catalog_check OK (0 warnings); manifests:
+  same id, uid 4e6d4132, version; arch aarch64 / armv7. CI checks out the kit twice: MPC_VST at 3e50b05 (page: tested on the
+  Force) and MPC_VST_RELEASE at 7c4bf25 (release.py, catalog_check). Why not bump the page kit too: the newer gen_vst changes
+  the built page (toggles' handler "Q-Link" -> "Toggle Switch", some label justifications) and its new skin_check warns
+  "TOUCH CAB and FULL overlap by 9x33 px" (the Cab toggle's touch box overlaps the IR length FULL button; true in the
+  current layout as well, worth a look). Bumping the page kit = re-test the page on a device.
+- VST2 struct layout checked: pointer-sized fields (intptr_t, pointers), as the kit's 64-bit wrapper.
+

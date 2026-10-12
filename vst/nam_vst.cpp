@@ -152,6 +152,10 @@ struct Inst {
   std::mutex mu;                            // browsers, requests; never taken by the audio thread
   std::condition_variable cv;
   bool stop = false, scan_req = true, work_req = false, scanned = false, scanning = true;
+  // a phone page asked for (GET TONES, BROWSE TONE3000, NAME ON PHONE): started by the worker, never in setParameter,
+  // since starting the server (socket, thread, loading libcurl) takes milliseconds (mu)
+  bool phone_req = false, phone_https = true;
+  std::string phone_kind;
   size_t ir_len_loaded = 0;
   int full_loaded = -1;                         // the size of the capture in the engine (worker): 0 Lite, 1 Full
   std::chrono::steady_clock::time_point full_armed_until{};   // A2 FULL: the first tap warns, a second within kFullArmSeconds turns it on (mu)
@@ -409,16 +413,24 @@ static void load_one(Inst* w, Browser& b, bool is_model) {
   w->update_display = 1;
 }
 
+static Tone3000* ensure_t3k(Inst* w);
 static void worker_main(Inst* w) {
   for (;;) {
-    bool scan;
+    bool scan, phone = false, phone_https = true;
+    std::string phone_kind;
     {
       std::unique_lock<std::mutex> lk(w->mu);
       w->cv.wait_for(lk, std::chrono::milliseconds(250), [w] { return w->stop || w->scan_req || w->work_req; });
       if (w->stop) return;
       scan = w->scan_req;
       w->scan_req = w->work_req = false;
+      if (w->phone_req) { phone = true; phone_kind = w->phone_kind; phone_https = w->phone_https; w->phone_req = false; }
       if (scan) { w->scanning = true; w->update_display = 1; }
+    }
+    if (phone) {                                 // the phone page: started here, off the host's thread
+      ensure_t3k(w)->start(phone_kind, phone_https);
+      std::lock_guard<std::mutex> lk(w->mu);
+      w->update_display = 1;
     }
     if (scan) {
       // Publish a scan's result: the lists, the saved or loaded files found again, a TONE3000 download selected.
@@ -753,7 +765,7 @@ static PresetsWebHooks mp_hooks(Inst* w) {
   return h;
 }
 
-// The phone pages' server (made on the first use; destroyed only at effClose, after the worker has stopped). Host
+// The phone pages' server (made on the first use; destroyed only at effClose, after the worker has stopped). Worker
 // thread, without w->mu held: w->t3k is read by the worker and the display calls under w->mu, so installed under it.
 static Tone3000* ensure_t3k(Inst* w) {
   {
@@ -774,13 +786,15 @@ static Tone3000* ensure_t3k(Inst* w) {
   return w->t3k.get();
 }
 // GET TONES / Browse TONE3000: the phone page (kind "model", "ir", or "" for the choice)
-static void open_tones(Inst* w, const std::string& kind) {
-  ensure_t3k(w)->start(kind);
-  w->update_display = 1;
+static void open_tones(Inst* w, const std::string& kind) {   // queued for the worker (no mu held by the caller)
+  std::lock_guard<std::mutex> lk(w->mu);
+  w->phone_req = true; w->phone_kind = kind; w->phone_https = true;
+  kick(w, false);
 }
 static void open_presets_page(Inst* w) {
-  ensure_t3k(w)->start("", false);               // no TONE3000 sign-in is wanted: no libcurl needed
-  w->update_display = 1;
+  std::lock_guard<std::mutex> lk(w->mu);
+  w->phone_req = true; w->phone_kind = ""; w->phone_https = false;   // no TONE3000 sign-in is wanted: no libcurl needed
+  kick(w, false);
 }
 
 // MY PRESETS, SAVE, DELETE (two taps), NAME ON PHONE

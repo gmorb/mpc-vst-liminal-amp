@@ -4,9 +4,12 @@
 # Build Liminal Amp.
 #   vst/build.sh            the device plugin: armhf (Zig, glibc 2.36, Cortex-A17 NEON) + its page (MPC skin)
 #   vst/build.sh host       the same plugin for this PC (tests); HOST_FLAGS adds flags (e.g. sanitizers)
+#   vst/build.sh aarch64    64-bit ARM, for Gen 2 devices (RK3588 / RK3588S: Cortex-A76 + A55; Zig, glibc 2.17 floor,
+#                           Armv8.2-A as the A55 cores run it; NEON is always on). UNTESTED on a device: -> vst/build/aarch64/
 # Needs: mpc-vst-plugins in $MPC_VST (default ../mpc-vst-plugins), python3 + Pillow, Eigen 3.4 headers
 # ($EIGEN, default /usr/include/eigen3), a host g++, and Zig (pip install ziglang) for the device build.
-# Output: vst/build/liminal_amp.so (device) or vst/build/host/liminal_amp.so, vst/build/skin/, pluginlist-entry.xml
+# Output: vst/build/liminal_amp.so (device), vst/build/aarch64/liminal_amp.so or vst/build/host/liminal_amp.so,
+#         vst/build/skin/, pluginlist-entry.xml
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
@@ -61,6 +64,31 @@ build() {   # $1 out dir, $2 C compiler, $3 C++ compiler, $4 extra flags, $5 lin
   [ "$failed" = 0 ] || { echo "error: a compile failed (see above)" >&2; exit 1; }
   $cxx $fl -shared -o "$out/liminal_amp.so" "${objs[@]}" -Wl,--version-script=vst/exports.map $lf
 }
+
+check_so() {   # $1 the .so, $2 the highest glibc allowed
+  local SO="$1" EXP GLIBC NEEDED
+  EXP=$(readelf --dyn-syms -W "$SO" | awk '$5=="GLOBAL" && $7!="UND" && $4!="NOTYPE"{print $8}' | tr '\n' ' ')
+  GLIBC=$(readelf -V "$SO" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
+  NEEDED=$(readelf -d "$SO" | sed -n 's/.*Shared library: \[\(.*\)\]/\1/p' | tr '\n' ' ')
+  echo "device plugin: $SO"
+  echo "   $(file -b "$SO" | cut -d, -f1-3)"
+  echo "   exported: $EXP"
+  echo "   needed:   $NEEDED"
+  echo "   highest glibc: $GLIBC"
+  [ "$EXP" = "VSTPluginMain " ] || { echo "error: unexpected exports" >&2; exit 1; }
+  case "$NEEDED" in *libstdc++*|*libc++*) echo "error: C++ runtime must be linked in" >&2; exit 1 ;; esac
+  [ "$(printf '%s\n%s\n' "$GLIBC" "$2" | sort -V | tail -1)" = "$2" ] || { echo "error: needs glibc > ${2#GLIBC_}" >&2; exit 1; }
+}
+
+if [ "$MODE" = aarch64 ]; then
+  ZIG="${ZIG:-python3 -m ziglang}"
+  # cortex_a55: the RK3588's little cores; its feature set (Armv8.2-A, dotprod, fp16) runs on the A76 big cores too
+  TGT="-target aarch64-linux-gnu.2.17 -mcpu=cortex_a55"
+  # PFFFT_ENABLE_NEON: PFFFT only uses NEON when asked (otherwise it builds its scalar code)
+  build "$B/aarch64" "$ZIG cc $TGT" "$ZIG c++ $TGT" "-DPFFFT_ENABLE_NEON" "-Wl,-s -Wl,--no-undefined -lpthread"
+  check_so "$B/aarch64/liminal_amp.so" GLIBC_2.17
+  exit 0
+fi
 
 if [ "$MODE" = host ]; then
   build "$B/host" gcc g++ "${HOST_FLAGS:-}" "-lpthread -ldl"

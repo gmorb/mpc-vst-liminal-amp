@@ -448,8 +448,12 @@ def main():
         d.wait(6800)                                   # a second tap would turn it on: let the warning lapse instead
         assert d.text("full") != "On" and d.dump()["full"][0] < .5
     if want("phone") or want("phone-edit"):
-        d.press("mp_phone", 400)
-        addr = d.text("t3k_info"); port = int(addr.rsplit(":", 1)[1])
+        d.press("mp_phone", 200)
+        for _ in range(50):                            # the plugin's worker opens the page
+            addr = d.text("t3k_info")
+            if addr.startswith("Open "): break
+            d.wait(100)
+        port = int(addr.rsplit(":", 1)[1])
         base = "http://127.0.0.1:%d" % port
         home, plist, edit = shoot([base + "/", base + "/presets", base + "/presets/edit?name=Crunch%20Rhythm"])
         if want("phone"):

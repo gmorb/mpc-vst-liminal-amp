@@ -389,6 +389,7 @@ int main(int argc, char** argv) {
     wait_for([&] { return idle(t); });
     CHECK(disp(t, P_T3K_INFO) == "Tap BROWSE TONE3000", "TONE3000 line before use: [%s]", disp(t, P_T3K_INFO).c_str());
     press(t, P_GET_TONES);
+    wait_for([&] { return disp(t, P_T3K_INFO).rfind("Open ", 0) == 0; }, 5);   // the worker opens the page
     const std::string open_line = disp(t, P_T3K_INFO);
     CHECK(open_line.rfind("Open 127.0.0.1:", 0) == 0 && t->getP(t, P_GET_TONES) == 0, "GET TONES opens the phone page: [%s]", open_line.c_str());
     const std::string self = "http://" + open_line.substr(5);
@@ -408,11 +409,13 @@ int main(int argc, char** argv) {
           "the IR block: [%s] [%s]", disp(t, P_IR_PACK).c_str(), disp(t, P_IR_INFO).c_str());
     // a block's Browse TONE3000 button: the page's Continue goes to that block's catalogue
     press(t, P_IR_BROWSE);
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
     std::string pagefile = (m1 / "page.html").string();
-    if (system(("curl -s -o '" + pagefile + "' " + self + "/").c_str()) != 0) printf("   (curl failed)\n");
     std::string html;
-    { std::ifstream f(pagefile); html.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()); }
+    wait_for([&] {                                 // the worker passes the request on: the page's Continue follows
+      if (system(("curl -s -o '" + pagefile + "' " + self + "/").c_str()) != 0) return false;
+      std::ifstream f(pagefile); html.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+      return html.find("Continue: cab IRs") != std::string::npos;
+    }, 5);
     CHECK(html.find("Continue: cab IRs") != std::string::npos && html.find("has partnered with TONE3000") != std::string::npos &&
           t->getP(t, P_IR_BROWSE) == 0, "CAB's BROWSE TONE3000: the partnership splash, Continue to cab IRs");
     auto t0 = std::chrono::steady_clock::now();
@@ -426,6 +429,7 @@ int main(int argc, char** argv) {
   // and the plugin carries on
   if (getenv("MPCNAM_EXPECT_NO_CURL")) {
     press(a, 20);
+    wait_for([&] { return disp(a, P_T3K_INFO) == "Needs libcurl"; }, 5);   // the worker tries to open the page
     CHECK(disp(a, P_T3K_INFO) == "Needs libcurl", "without libcurl, GET TONES says so: [%s]", disp(a, P_T3K_INFO).c_str());
     render(a, 100, &fin);
     CHECK(fin, "and audio carries on");
@@ -474,7 +478,8 @@ int main(int argc, char** argv) {
     press(p1, P_GET_TONES); press(p2, P_GET_TONES);
     wait_for([&] { return disp(p1, P_T3K_INFO).find("Open ") == 0 && disp(p2, P_T3K_INFO).find("Open ") == 0; }, 5);
     const std::string s1 = disp(p1, P_T3K_INFO), s2 = disp(p2, P_T3K_INFO);
-    CHECK(s1 == "Open 127.0.0.1:" + std::to_string(base) && s2 == "Open 127.0.0.1:" + std::to_string(base + 1),
+    const std::string a1 = "Open 127.0.0.1:" + std::to_string(base), a2 = "Open 127.0.0.1:" + std::to_string(base + 1);
+    CHECK((s1 == a1 && s2 == a2) || (s1 == a2 && s2 == a1),            // each worker opens its own: either may be first
           "two instances, two pages: [%s] [%s]", s1.c_str(), s2.c_str());
     CHECK(fetch(base).find("has partnered with TONE3000") != std::string::npos && fetch(base + 1).find("has partnered with TONE3000") != std::string::npos,
           "both pages answer");

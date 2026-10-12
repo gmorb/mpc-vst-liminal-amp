@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.1
+- Tapping GET TONES, BROWSE TONE3000 or NAME ON PHONE no longer does its work on the tapping thread: the phone page's
+  server (network socket, its thread, loading libcurl) now starts on the plugin's background thread. The first tap
+  used to take several milliseconds right where it was made, which the catalog's CPU bench counted as an overrun of a
+  whole audio block. Nothing else changes; the page opens a moment after the tap, as before.
+- Gen 2 (64-bit ARM: MPC Live III and kin, RK3588 / RK3588S): `Liminal-Amp-1.0.1-mpc-aarch64.zip` on the same release,
+  made the build kit's way (its release.py and catalog check, pinned newer for packaging only; the page is unchanged), so
+  its installer registers it in MPC's 64-bit plugin list and the catalog offers it on Gen 2. Tested under 64-bit ARM
+  emulation only (whole plugin test, and the FFT against the official convolution); see docs/GEN2.md. Its cab IR's FFT
+  uses NEON.
+- The release records a CPU figure measured on a Force with the catalog's bench (`tools/bench_device.sh`, which runs
+  it on copies of a capture and an IR in /tmp, so the bench's random parameter sweep can't delete or save anything on
+  your card).
+
 ## 1.0.0
 - New page (v3), in the design system of the companion plugin Liminal Hz (one page, near-black textured background,
   large type, engraved knobs, one accent that means "a live value") with this plugin's own identity: a guitar amp.
