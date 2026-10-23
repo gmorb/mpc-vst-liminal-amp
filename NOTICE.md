@@ -18,7 +18,7 @@ under its own licence (texts in `licenses/` in the release, and in the source tr
 | Eigen 3.4.0 (headers) | Eigen authors | MPL-2.0 | the model's matrix maths; source: https://eigen.tuxfamily.org (or Ubuntu's libeigen3-dev) |
 | Titillium Web (baked into the page's images) | Accademia di Belle Arti di Urbino | SIL OFL 1.1 | page titles |
 
-Built with [mpc-vst-plugins](https://github.com/sd88me/mpc-vst-plugins) (sd88me) at `081c247310560cc94bcdb0dd4db3a40e395cbe96` (page and plugin-list
+Built with [mpc-vst-plugins](https://github.com/sd88me/mpc-vst-plugins) (sd88me) at `3e50b052268d81e6c61a17a1390ced62f0fdff74` (page and plugin-list
 generator, Q-Link maps). At that commit that repository states no licence of its own; its bundled force-shadow
 tools are MIT (Copyright (c) 2026 sd88me).
 

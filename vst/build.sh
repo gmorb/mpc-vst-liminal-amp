@@ -96,7 +96,9 @@ if [ "$MODE" = host ]; then
 else
   ZIG="${ZIG:-python3 -m ziglang}"
   TGT="-target arm-linux-gnueabihf.2.36 -mcpu=cortex_a17"
-  build "$B/device" "$ZIG cc $TGT" "$ZIG c++ $TGT" "" "-Wl,-s -Wl,--no-undefined -lpthread"
+  # PFFFT_ENABLE_NEON (1.1.0): the cab IR's FFT in NEON, as the Gen 2 build (it was scalar before: PFFFT only uses NEON
+  # when asked). Every Gen 1 device (RK3288, Cortex-A17) has NEON; ARM=1 tools/test.sh checks it against the official IR.
+  build "$B/device" "$ZIG cc $TGT" "$ZIG c++ $TGT" "-DPFFFT_ENABLE_NEON" "-Wl,-s -Wl,--no-undefined -lpthread"
   cp "$B/device/liminal_amp.so" "$B/liminal_amp.so"
   SO="$B/liminal_amp.so"
   EXP=$(readelf --dyn-syms -W "$SO" | awk '$5=="GLOBAL" && $7!="UND" && $4!="NOTYPE"{print $8}' | tr '\n' ' ')

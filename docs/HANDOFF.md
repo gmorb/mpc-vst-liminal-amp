@@ -483,3 +483,14 @@ with Crate Digger and Profit-08, 2026-10-11); aarch64 glibc ceiling 2.39; tested
   current layout as well, worth a look). Bumping the page kit = re-test the page on a device.
 - VST2 struct layout checked: pointer-sized fields (intptr_t, pointers), as the kit's 64-bit wrapper.
 
+## 2026-10-23: 1.0.2, NEON FFT on Gen 1
+- vst/build.sh: the armhf device build now passes `-DPFFFT_ENABLE_NEON` (as the aarch64 build). The 2026-10-10 finding:
+  PFFFT was scalar on Gen 1. Verified: the device .so's NEON quad float ops 370 -> 1061 (llvm-objdump); tools/test.sh
+  ARM=1 now also builds ir_test for armhf with NEON and runs it under qemu-arm: PASS, max |ours - official| 3.5e-6.
+  Full suite PASS (host, ARM=1, ARM64=1).
+- Asked for, then withdrawn by the user: an "IR HQ" two-tap switch (IRs to 32768 samples, band-limited resampling). The
+  user wants the official NAM plugin's IR spec kept (8192 samples, cubic resampling); reverted completely, not shipped.
+  Both builds have the same sound and options; Gen 2 differs only in speed.
+- Needs: a Force bench of 1.0.2 (tools/bench_device.sh with SO_FILE from the release's armv7 zip) to record the lower figure.
+- NOTICE.md's kit commit corrected to the pinned 3e50b05.
+

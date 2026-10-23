@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2
+- Gen 1 (Force, MPC Live / Live II / One / X / Key 61) now runs the cab IR's FFT with NEON, as the Gen 2 build does.
+  Before, the Gen 1 build compiled PFFFT's scalar code (PFFFT only uses NEON when asked, and the Gen 1 build never
+  asked), so the same plugin was slower on Gen 1 than it needed to be. Same sound: the IR stays the official NAM
+  plugin's (cubic resampling, up to 8192 samples, -18 dB), checked against the official direct convolution on 32-bit
+  ARM (`ARM=1 tools/test.sh` now also runs ir_test as the device build makes it). Less CPU for the cab, which leaves
+  more room for A2 FULL. Nothing else changes: same controls, presets and project format.
+
 ## 1.0.1
 - Tapping GET TONES, BROWSE TONE3000 or NAME ON PHONE no longer does its work on the tapping thread: the phone page's
   server (network socket, its thread, loading libcurl) now starts on the plugin's background thread. The first tap

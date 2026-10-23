@@ -2,7 +2,7 @@
   "name": "Liminal Amp",
   "vendor": "Gm0rb",
   "uid": "NmA2",
-  "version": 101,
+  "version": 102,
   "so": "liminal_amp.so",
   "params": "params.json",
   "layout": "layout.conf",

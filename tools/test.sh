@@ -14,7 +14,8 @@
 #   plugin_test    the .so as MPC uses it: browsing, loading, broken and stereo files, projects, rescan, threads,
 #                  and GET TONES (with the mock)
 # SANITIZE=asan|tsan builds the plugin and plugin_test with AddressSanitizer+UBSan or ThreadSanitizer instead.
-# ARM=1 also runs plugin_test against the device .so (vst/build/liminal_amp.so) under qemu-arm (slow: ~10 min).
+# ARM=1 also runs plugin_test against the device .so (vst/build/liminal_amp.so) under qemu-arm (slow: ~10 min), and
+# ir_test built as the device build is (32-bit ARM, NEON FFT).
 # ARM64=1 runs plugin_test against the Gen 2 build (vst/build/aarch64/liminal_amp.so) and ir_test (the FFT with NEON vs
 # direct convolution) under qemu-aarch64 (needs qemu-user and libc6-arm64-cross).
 set -euo pipefail
@@ -104,6 +105,15 @@ if [ "${ARM:-0}" = 1 ]; then
   $ZIG c++ -target arm-linux-gnueabihf.2.36 -mcpu=cortex_a17 -O2 -std=c++20 -w tools/plugin_test.cpp -o "$T/plugin_test_arm" -ldl -lpthread 2>/dev/null
   run plugin_test_arm env QEMU_LD_PREFIX=/usr/arm-linux-gnueabihf MPCNAM_EXPECT_NO_CURL=1 MPCNAM_T3K_PORT=18094 MPCNAM_T3K_HOST=127.0.0.1 qemu-arm "$T/plugin_test_arm" "$R/vst/build/liminal_amp.so" \
       "$IN/a2_slimmable.nam" "$IN/a2_3.nam" "$IN/ir_long.wav" "$IN/ir_short.wav"
+  # the cab IR's FFT as the device build makes it (NEON, 32-bit ARM) against the official direct convolution, and IR HQ
+  AH="-target arm-linux-gnueabihf.2.36 -mcpu=cortex_a17"
+  for c in pffft pffft_common; do
+    $ZIG cc $AH -O2 -w -DPFFFT_ENABLE_NEON -Iengine/pffft -c "engine/pffft/$c.c" -o "$T/${c}_arm.o"
+  done
+  $ZIG c++ $AH -O2 -std=c++20 -w -D_FILE_OFFSET_BITS=64 -DPFFFT_ENABLE_NEON -DNAM_SAMPLE_FLOAT -include engine/compat.h $INC \
+      tools/ir_test.cpp engine/ir_convolver.cpp engine/wav_reader.cpp "$A/ImpulseResponse.cpp" "$A/dsp.cpp" "$A/wav.cpp" \
+      "$T/pffft_arm.o" "$T/pffft_common_arm.o" -o "$T/ir_test_arm" -lpthread
+  run ir_test_arm env QEMU_LD_PREFIX=/usr/arm-linux-gnueabihf qemu-arm "$T/ir_test_arm"
 fi
 if [ "${ARM64:-0}" = 1 ]; then
   ZIG="${ZIG:-python3 -m ziglang}"

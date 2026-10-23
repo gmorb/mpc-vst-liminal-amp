@@ -11,8 +11,8 @@ The kit's route itself is proven on a real MPC Live III (MPC OS 5.0.18) with two
 ## What's in the Gen 2 zip
 - The same plugin: same page, parameters, uid, projects and presets (saved projects move between generations).
 - Built for 64-bit ARM: Armv8.2-A as the RK3588's Cortex-A55 cores run it (the A76 cores run it too), glibc 2.17 or
-  newer (Gen 2 has 2.39), the C++ runtime built in. NEON throughout, including the cab IR's FFT (the Gen 1 build's FFT is
-  scalar; see docs/HANDOFF.md).
+  newer (Gen 2 has 2.39), the C++ runtime built in. NEON throughout, including the cab IR's FFT (as the Gen 1 build since
+  1.0.2). Both generations make the same sound with the same options; Gen 2 is just faster hardware.
 - Its manifest says `arch: aarch64`, so the zip's `install.sh` refuses to run on a 32-bit device and registers the plugin
   in MPC's 64-bit plugin list (`pluginList-arm-64bit`, confirmed on an MPC Live III by the kit).
 - No CPU figure: the release's bench result is from a Gen 1 Force.
@@ -44,5 +44,5 @@ It builds the catalog's bench for 64-bit ARM, runs it safely in /tmp on copies o
 
 ## Tested on
 Once it has run on a Gen 2 device, add a `tested.json` entry whose device names it with "Gen2", e.g.
-`{"version": "1.0.1", "device": "MPC Live III (Gen2)", "firmware": "5.0.18", "date": "..."}`: the catalog marks
+`{"version": "1.0.2", "device": "MPC Live III (Gen2)", "firmware": "5.0.18", "date": "..."}`: the catalog marks
 the version "Gen2 · tested" only then.
