@@ -9,7 +9,7 @@
 #      and Zig's (vst/build.sh zighost), the toolchain and C++ runtime of the device builds.
 #   2. With ARM=1, the same test on the two device binaries in the 3.10.1 folder (liminal_amp-arm32.so / -arm64.so),
 #      each run by host_sim built for that CPU, under qemu-arm / qemu-aarch64 (slow: a few minutes each).
-#   3. validate.py checks the folder in dist/Liminal-Amp-<VERSION>-mpc-sdk.zip: plugin.json, folder name, both .so
+#   3. validate.py checks the folder in dist/Liminal-Amp-<VERSION>-MPC-OS-3.10.1.zip: plugin.json, folder name, both .so
 #      (architecture, dependencies, glibc, exports), the skins and version.xml, against what host_sim read from the plugin.
 # Run after vst/build.sh host, vst/build.sh zighost and tools/package.sh. AKAI_SDK = a checkout of the SDK (default
 # ../akai-sdk).
@@ -30,7 +30,7 @@ ZIG="${ZIG:-python3 -m ziglang}"
 [ -f "$AKAI_SDK/tools/validate.py" ] || { echo "no Akai SDK at $AKAI_SDK (set AKAI_SDK)" >&2; exit 1; }
 GCC_SO="$ROOT/vst/build/host/liminal_amp.so"
 ZIG_SO="$ROOT/vst/build/zighost/liminal_amp.so"
-ZIP="$ROOT/dist/Liminal-Amp-$VERSION-mpc-sdk.zip"
+ZIP="$ROOT/dist/Liminal-Amp-$VERSION-MPC-OS-3.10.1.zip"
 [ -f "$GCC_SO" ] || { echo "build the PC plugin first: vst/build.sh host" >&2; exit 1; }
 [ -f "$ZIG_SO" ] || { echo "build the Zig PC plugin first: vst/build.sh zighost" >&2; exit 1; }
 [ -f "$ZIP" ] || { echo "package first: tools/package.sh (no $ZIP)" >&2; exit 1; }

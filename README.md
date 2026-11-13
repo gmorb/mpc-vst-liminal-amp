@@ -155,7 +155,7 @@ be any sample rate; a stereo IR is mixed down to mono. The plugin remembers wher
 **RESCAN** are quick even on a full card.
 
 ## Install
-**MPC OS 3.10.1 and later (every MPC and Force):** download **`Liminal-Amp-<version>-mpc-sdk.zip`** from
+**MPC OS 3.10.1 and later (every MPC and Force):** download **`Liminal-Amp-<version>-MPC-OS-3.10.1.zip`** from
 [Releases](../../releases). It holds one folder, `Gm0rb - VST - Liminal Amp`, with both builds: 32-bit for the Force,
 MPC X, X SE, Live, Live II, One, One+, Key 61 and Key 37, and 64-bit for the MPC Live III and MPC XL (its `plugin.json`
 tells each MPC which to load). No root access or scripts.

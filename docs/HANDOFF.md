@@ -498,7 +498,7 @@ with Crate Digger and Profit-08, 2026-10-11); aarch64 glibc ceiling 2.39; tested
 - MPC OS 3.10.1 loads plugins officially from `<drive>/VST2 Plugins/<Manufacturer> - VST - <Name>/` with a `plugin.json`
   (inmusic-software/mpc-plugin-builder-sdk at febd2ca, MIT; docs/plugin-folder-format.md, host-contract.md). Same VST2
   ABI and skin format as before, so no port to Akai's `mpc::Plugin` framework was needed: the release gains
-  `Liminal-Amp-<v>-mpc-sdk.zip`, made by the kit's `tools/sdk_zip.py` (release tools pinned at 0093538) from the two catalog
+  `Liminal-Amp-<v>-MPC-OS-3.10.1.zip`, made by the kit's `tools/sdk_zip.py` (release tools pinned at 0093538) from the two catalog
   zips, whose folders now carry a plugin.json too (the kit's newer release.py). The .so files stay at the folder root
   (`liminal_amp-arm32.so` / `-arm64.so`), as the kit does: `Library::plugin_dir()` is the .so's folder (now also its
   parent when the .so is in `VST/` next to plugin.json).
@@ -517,8 +517,27 @@ with Crate Digger and Profit-08, 2026-10-11); aarch64 glibc ceiling 2.39; tested
 - Page: pixel-identical to 1.0.2's (compared against the v1.0.2 release zip; only one knob strip's file name differs).
 - The 1.0.2 commit had deleted tested.json and src/nam-core/NAM/json.hpp (the agent removed files missing from the repo
   zip): restored. Lesson: build the hand-over zip from `git ls-files`, not from a local tree.
-- Dropped the Force VST distribution zip (vstscanner). Releases: -mpc-sdk.zip (3.10.1+), -mpc-armv7/-aarch64.zip (catalog).
+- Dropped the Force VST distribution zip (vstscanner). Releases: -MPC-OS-3.10.1.zip (3.10.1+, named as Liminal Hz 1.4.1 names its own), -mpc-armv7/-aarch64.zip (catalog).
 - Not yet done on hardware: loading the 3.10.1 folder on a device running 3.10.1 (the owner's Force, then a Live III).
   The network page (TONE3000) and libcurl on stock 3.10.1 are unknowns: libcurl is dlopen'ed and its absence shows
   "Needs libcurl" (everything else works).
+- **Liminal Hz 1.4.0/1.4.1's UI fixes applied** (gmorb/mpc-vst-liminal-hz at 5da61d5; its CHANGELOG and commits 0904f37,
+  8efd7f5, 3881b1f, a5e5a19, 0da8616):
+  - kTapMs = 300: DELETE (model, IR), MP DELETE, MP SAVE and A2 FULL ignore a press within 300 ms of the previous host
+    event on that control (`tap_guarded`, `tap_at[]`), reporting the value back. On the device (Hz, MPC OS 3.10) a tap can
+    arrive twice and Hz's two-tap LONG IR came on at the first tap. Hz then made LONG IR a plain toggle; Amp keeps A2 FULL's
+    two taps (the owner's wish) with the guard.
+  - UpdateDisplay pacing in notify(): at most one per 100 ms, held up to 600 ms while a capture or IR loads
+    (`disp_wait`, `disp_since`, `disp_last`); `host_view[]` skips Automates of values the host has while a redraw is due.
+    plugin_test: a cab pick at real time = 1 redraw.
+  - DELETE: the file is erased from `b->lib` and the next one requested; no rescan.
+  - set_chunk: DELETE / MP DELETE / A2 FULL disarmed, host_view reset. NOT Hz's "lists close on project load": Amp's list
+    state is a parameter (P_AMP_MENU / P_CAB_MENU), and host_sim's state round trip FAILs when a load changes it (it saved
+    "open"); a project opens in a new instance (lists closed) anyway.
+  - Issue #5 (buttons stepped twice per tap): Hz's kit (7c4bf25) gives shTrig_* "Toggle Switch" on Mouse Down; Amp's page
+    kit (3e50b05) gives "Q-Link" already, so Amp never had it. vst/skin_post.py now fixes/fails the build if it returns.
+  - The 3.10.1 zip is named `Liminal-Amp-<v>-MPC-OS-3.10.1.zip`, as Hz's `Liminal-Hz-<v>-MPC-OS-3.10.1.zip` (the kit's
+    catalog convention `-mpc-sdk.zip` isn't used, so the catalog site won't offer its "3.10.1 format" download for it;
+    the Plugin Manager installs on 3.10.1 anyway).
+  - Not applicable to Amp: Hz's My IR -> Init, programs menu, Q-Link order, LONG IR, Duck/SYNC.
 

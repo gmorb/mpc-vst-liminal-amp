@@ -4,7 +4,7 @@
 same source: same page, parameters, uid, projects and presets (saved projects move between the two kinds of MPC).
 
 ## MPC OS 3.10.1 and later: nothing special
-Since 1.1.0 the release's **`Liminal-Amp-<version>-mpc-sdk.zip`** is one plugin folder for every MPC, in Akai's plugin
+Since 1.1.0 the release's **`Liminal-Amp-<version>-MPC-OS-3.10.1.zip`** is one plugin folder for every MPC, in Akai's plugin
 folder format: `plugin.json` names `liminal_amp-arm32.so` (`file32`) and `liminal_amp-arm64.so` (`file64`), and each MPC
 loads its own. Copy the folder into `<drive>/VST2 Plugins/` and turn on **Preferences → Enhancements (Beta) → Enable
 Enhancements** and **External Plugin Support** (see the README). No root access is needed.

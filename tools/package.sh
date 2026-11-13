@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 the mpc-vst-liminal-amp contributors
 # Package Liminal Amp (run vst/build.sh and vst/build.sh aarch64 first), with REPO=owner/name (GITHUB_REPOSITORY in CI):
-#   dist/Liminal-Amp-<VERSION>-mpc-sdk.zip      MPC OS 3.10.1 and later, every MPC: ONE plugin folder in Akai's format
+#   dist/Liminal-Amp-<VERSION>-MPC-OS-3.10.1.zip      MPC OS 3.10.1 and later, every MPC: ONE plugin folder in Akai's format
 #                                               (plugin.json, file32 + file64) to copy into <drive>/VST2 Plugins/
 #   dist/Liminal-Amp-<VERSION>-mpc-armv7.zip    the MPC OS Plugin Catalog packages (Gen 1 / Gen 2), with install.sh for
 #   dist/Liminal-Amp-<VERSION>-mpc-aarch64.zip  older modded firmware; their folders carry a plugin.json too
@@ -85,8 +85,8 @@ if [ -n "$REPO" ]; then
     echo "catalog zip ok: $z"
   done
   # 4. the MPC OS 3.10.1 folder: both builds in one folder (Akai's plugin folder format), made from the two catalog zips
-  python3 "$MPC_VST_RELEASE/tools/sdk_zip.py" "dist/Liminal-Amp-$VERSION-mpc-sdk.zip" dist/*-mpc-armv7.zip dist/*-mpc-aarch64.zip >/dev/null
-  echo "3.10.1 folder zip: dist/Liminal-Amp-$VERSION-mpc-sdk.zip"
+  python3 "$MPC_VST_RELEASE/tools/sdk_zip.py" "dist/Liminal-Amp-$VERSION-MPC-OS-3.10.1.zip" dist/*-mpc-armv7.zip dist/*-mpc-aarch64.zip >/dev/null
+  echo "3.10.1 folder zip: dist/Liminal-Amp-$VERSION-MPC-OS-3.10.1.zip"
 else
   echo "no REPO / GITHUB_REPOSITORY: catalog zip skipped (set REPO=owner/name)"
 fi

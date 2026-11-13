@@ -54,9 +54,10 @@ enum { P_INPUT, P_GATE_ON, P_GATE, P_BASS, P_MID, P_TREBLE, P_EQ_ON, P_OUTPUT, P
 
 static int fails = 0;
 #define CHECK(c, ...) do { printf("%s ", (c) ? "ok  " : "FAIL"); printf(__VA_ARGS__); printf("\n"); if (!(c)) fails++; } while (0)
-static std::atomic<int> automates{0};
+static std::atomic<int> automates{0}, redraws{0};
 static intptr_t host(AEffect*, int32_t op, int32_t, intptr_t, void*, float) {
   if (op == 0) automates++;
+  if (op == 42) redraws++;                       // audioMasterUpdateDisplay: MPC re-reads every parameter and redraws
   return op == 1 ? 2400 : 0;
 }
 static AEffect* (*entry)(hostcb);
@@ -101,6 +102,9 @@ static AEffect* open_plugin() {
 }
 static void close_plugin(AEffect* a) { a->d(a, 1, 0, 0, nullptr, 0); }
 static void press(AEffect* a, int i) { a->setP(a, i, 1.0f); render(a, 2); }
+// a second tap by a finger: DELETE, SAVE and A2 FULL take a press within 300 ms of the previous one as the same tap
+// (MPC can deliver one touch twice), so a deliberate second tap comes later
+static void finger() { std::this_thread::sleep_for(std::chrono::milliseconds(350)); }
 static void write_stereo_wav(const fs::path& p) {   // 16-bit stereo: a valid WAV the official loader refuses
   std::ofstream f(p, std::ios::binary);
   auto u32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
@@ -171,6 +175,20 @@ int main(int argc, char** argv) {
   // browsing
   press(a, P_MODEL_NEXT); wait_for([&] { return idle(a); });
   CHECK(disp(a, P_MODEL) == "JCM A2" && disp(a, P_MODEL_INFO) == "Model 1 of 1 \xC2\xB7 Local" && disp(a, P_MODEL_PACK) == "Marshall", "next: [%s] [%s]", disp(a, P_MODEL).c_str(), disp(a, P_MODEL_INFO).c_str());
+  { // 1.1.0 (Liminal Hz 1.4.0): a pick redraws MPC's screen once, when the new file is ready, not once for the pick and
+    // again for the load (each UpdateDisplay makes MPC re-read every parameter): paced at most one per 100 ms, held up to
+    // 600 ms while a file loads. Rendered in real time, as MPC does.
+    wait_for([&] { return idle(a); });
+    render(a, 40);
+    const std::string ir0 = disp(a, P_IR);
+    redraws = 0;
+    press(a, P_IR_NEXT);
+    for (int k = 0; k < 345; k++) { render(a, 1); std::this_thread::sleep_for(std::chrono::microseconds(2900)); }
+    const int r = redraws;
+    CHECK(idle(a) && disp(a, P_IR) != ir0 && r >= 1 && r <= 2, "a cab pick redraws the screen %d time(s) (at most 2; one when it loads fast)", r);
+    press(a, P_IR_PREV); wait_for([&] { return idle(a) && disp(a, P_IR) == ir0; });
+    render(a, 40);
+  }
   { // A2 FULL takes two taps: the first warns and stays off, the second (within a few seconds) turns it on
     const std::string pack0 = disp(a, P_MODEL_PACK), info0 = disp(a, P_MODEL_INFO), hdr0 = disp(a, P_T3K_INFO);
     a->setP(a, P_FULL, 1.0f);
@@ -182,6 +200,7 @@ int main(int argc, char** argv) {
     CHECK(disp(a, P_MODEL_PACK) == pack0 && disp(a, P_MODEL_INFO) == info0 && disp(a, P_T3K_INFO) == hdr0,
           "tapping it off again clears the warning: [%s|%s] [%s|%s] [%s|%s]", pack0.c_str(), disp(a, P_MODEL_PACK).c_str(),
           info0.c_str(), disp(a, P_MODEL_INFO).c_str(), hdr0.c_str(), disp(a, P_T3K_INFO).c_str());
+    finger();
     a->setP(a, P_FULL, 1.0f);                    // first tap again, then let the warning run out
     std::this_thread::sleep_for(std::chrono::milliseconds(6500));
     wait_for([&] { return disp(a, P_MODEL_INFO) == info0; }, 3);
@@ -189,6 +208,10 @@ int main(int argc, char** argv) {
           "the warning runs out by itself and it stays off: [%s] [%s]", disp(a, P_MODEL_PACK).c_str(), disp(a, P_MODEL_INFO).c_str());
     a->setP(a, P_FULL, 1.0f);                    // a lone tap after that warns again (it is not left half-armed)
     CHECK(a->getP(a, P_FULL) == 0.0f, "a tap after the warning ran out warns again");
+    a->setP(a, P_FULL, 1.0f);                    // 1.1.0: the same touch delivered twice (as MPC OS 3.10 can) is one tap
+    CHECK(a->getP(a, P_FULL) == 0.0f && disp(a, P_T3K_INFO).find("again") != std::string::npos,
+          "one touch delivered twice doesn't turn A2 FULL on (it only warns)");
+    finger();
     a->setP(a, P_FULL, 1.0f);                    // the second tap
   }
   { // A2 FULL: the same A2 file at its Full size (reloaded in the background), and back
@@ -452,11 +475,30 @@ int main(int argc, char** argv) {
     std::this_thread::sleep_for(std::chrono::milliseconds(4500));
     CHECK(disp(x, P_MODEL_INFO) != "Tap DELETE again to delete it permanently" && fs::exists(m1 / "662522/models/zz broken.nam"),
           "after 4 s it's forgotten, the file untouched: [%s]", disp(x, P_MODEL_INFO).c_str());
+    { // 1.1.0: a project's state disarms DELETE (Liminal Hz 1.4.1). Another instance, on the same files: nothing is deleted
+      AEffect* y = open_plugin();
+      wait_for([&] { return idle(y); });
+      y->setP(y, P_MODEL_DELETE, 1.0f);
+      const bool armed = disp(y, P_MODEL_INFO) == "Tap DELETE again to delete it permanently";
+      void* ck = nullptr; intptr_t n = y->d(y, 23, 0, 0, &ck, 0); std::string c((const char*)ck, n);
+      y->d(y, 24, 0, n, (void*)c.data(), 0);
+      CHECK(armed && disp(y, P_MODEL_INFO) != "Tap DELETE again to delete it permanently",
+            "a project's state disarms DELETE: [%s]", disp(y, P_MODEL_INFO).c_str());
+      y->d(y, 1, 0, 0, nullptr, 0);
+    }
+    finger();
     x->setP(x, P_MODEL_DELETE, 1.0f);
-    x->setP(x, P_MODEL_DELETE, 1.0f);
+    x->setP(x, P_MODEL_DELETE, 1.0f);           // 1.1.0: the same touch delivered twice only asks
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    CHECK(fs::exists(m1 / "662522/models/zz broken.nam") && disp(x, P_MODEL_INFO) == "Tap DELETE again to delete it permanently",
+          "one touch delivered twice doesn't delete (it only asks): [%s]", disp(x, P_MODEL_INFO).c_str());
+    finger();
+    x->setP(x, P_MODEL_DELETE, 1.0f);           // a second tap by a finger: delete
     wait_for([&] { return disp(x, P_MODEL_INFO) == "Deleted"; }, 5);
     CHECK(!fs::exists(m1 / "662522/models/zz broken.nam") && !fs::exists(m1 / "662522/Deleted"),
           "two taps: the file is deleted permanently (info [%s])", disp(x, P_MODEL_INFO).c_str());
+    CHECK(disp(x, P_MODEL) != "Searching..." && disp(x, P_MODEL) != "zz broken",
+          "1.1.0: taken out of the list at once, no search of the cards: [%s]", disp(x, P_MODEL).c_str());
     wait_for([&] { return idle(x) && disp(x, P_MODEL) != "zz broken"; }, 10);
     CHECK(disp(x, P_MODEL) != "zz broken" && disp(x, P_MODEL) != "-", "and the list moves on to [%s]", disp(x, P_MODEL).c_str());
     press(x, P_RESCAN); wait_for([&] { return idle(x); });
@@ -540,8 +582,12 @@ int main(int argc, char** argv) {
     wait_for([&] { return disp(q, P_AMP_ROW1) != ""; }, 5);
     CHECK(fs::exists(pd / (amp + ".na2p")) && disp(q, P_AMP_ROW1) == amp && q->getP(q, P_AMP_ROW1) == 1 && disp(q, P_PRESET) == "My: " + amp,
           "SAVE keeps the sound as \"%s\", selected and named in the header: [%s] [%s]", amp.c_str(), disp(q, P_AMP_ROW1).c_str(), disp(q, P_PRESET).c_str());
+    finger();
     press(q, P_MP_SAVE);
+    press(q, P_MP_SAVE);                         // 1.1.0: the same touch delivered twice saves once
     wait_for([&] { return disp(q, P_AMP_ROW1 + 1) != ""; }, 5);
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    CHECK(!fs::exists(pd / (amp + " 3.na2p")), "one touch delivered twice saves once");
     CHECK(disp(q, P_AMP_ROW1 + 1) == amp + " 2" && title().find("Presets 1-2 of 2") != std::string::npos || title() == "Saved",
           "a second SAVE is numbered: [%s] [%s]", disp(q, P_AMP_ROW1 + 1).c_str(), title().c_str());
     q->setP(q, P_BASS, 0.2f);
@@ -562,6 +608,7 @@ int main(int argc, char** argv) {
     CHECK(q->d(q, 26, P_MP_SAVE, 0, nullptr, 0) == 0 && q->d(q, 26, P_PRESET, 0, nullptr, 0) == 0, "the preset controls are not automatable");
     press(q, P_MP_DELETE);
     CHECK(title() == "Tap DELETE again" && fs::exists(pd / (amp + ".na2p")), "DELETE asks first: [%s]", title().c_str());
+    finger();
     press(q, P_MP_DELETE);
     wait_for([&] { return !fs::exists(pd / (amp + ".na2p")); }, 5);
     wait_for([&] { return disp(q, P_PRESET) == "No preset"; }, 5);

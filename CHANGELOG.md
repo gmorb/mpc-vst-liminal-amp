@@ -3,7 +3,7 @@
 ## 1.1.0
 - **MPC OS 3.10.1 and later: one folder for every MPC.** MPC OS 3.10.1 loads third-party plugins officially from a
   `VST2 Plugins` folder on any drive (Preferences → Enhancements (Beta) → Enable Enhancements and External Plugin
-  Support), with no root access. The new release file `Liminal-Amp-<v>-mpc-sdk.zip` is Liminal Amp in Akai's plugin folder
+  Support), with no root access. The new release file `Liminal-Amp-<v>-MPC-OS-3.10.1.zip` (named as Liminal Hz's) is Liminal Amp in Akai's plugin folder
   format: `plugin.json` with both builds (`liminal_amp-arm32.so` for the Force and 32-bit MPCs, `liminal_amp-arm64.so`
   for the MPC Live III and MPC XL), `version.xml` with the UI version the MPC's skins need (0.1.0.0), the page, licences
   and a README with the steps. Checked with Akai's MPC Plugin SDK on every build (`tools/akai_check.sh`): `validate.py`
@@ -13,6 +13,20 @@
   (Zig) left the library's C++ static destructors registered after unload, so they ran at the MPC application's exit
   from unmapped code. The plugin now runs them itself at unload. A `vst/build.sh zighost` build (the same toolchain for
   the PC) keeps this tested without emulation.
+- **From Liminal Hz 1.4.0 / 1.4.1's device tests (MPC OS 3.10):**
+  - **One touch can't confirm a two-tap control.** MPC can deliver one tap twice, ~130 ms apart; on Liminal Hz that turned
+    a two-tap switch on at the first tap. DELETE (capture, IR), My Presets' DELETE and A2 FULL now take a press within
+    0.3 s of the previous one as the same tap: the first tap still only asks or warns, and a second tap by a finger
+    confirms. My Presets' SAVE the same way, so one touch saves one preset.
+  - **A pick redraws the screen once.** MPC answers each "update the display" call from a plugin by reading every
+    parameter again and rebuilding its screen. Picking a capture or an IR asked for one at the tap and another when the
+    file was ready, and a long name sliding in a list asked for one on every step. These calls are now paced (at most one
+    per 0.1 s, and one waits up to 0.6 s for the file to load), and values MPC already has aren't sent again.
+  - **DELETE no longer searches the cards.** It took the file out by searching every drive again ("Searching..."); it
+    now drops it from the list at once and moves to the next file.
+  - **Opening a project disarms DELETE and A2 FULL** (a first tap made before it no longer counts).
+  - Buttons switch once per tap (Liminal Hz's issue #5: NEXT PACK and the list buttons stepped twice per tap). Liminal
+    Amp's page already did; the page build now checks it.
 - **Buttons that act are no longer automatable** (DELETE, RESCAN, BROWSE TONE3000 / GET TONES, the file arrows and the
   text lines): MPC OS 3.10.1 honours this, so an automation lane can never press DELETE. The sound controls, the capture
   and IR choice, ECO, A2 FULL and the pack steps stay automatable.

@@ -41,5 +41,23 @@ for d in t["pageData"]["componentDefinitions"]["localComponentDefinitions"]:
 missing = {(p_, n) for p_, n, _, _ in ROLES} - done
 if missing:
     sys.exit("skin_post: no component for %s (layout changed?)" % sorted(missing))
+
+# One tap, one press (Liminal Hz issue #5, MPC OS 3.10): a button whose component has a Button inside and ALSO a
+# "Toggle Switch" action on Mouse Down switches its value twice per tap, so NEXT PACK, PREV/NEXT in the lists, DELETE...
+# take two steps. The kit pinned here already gives the buttons (shTrig_*) Mouse Down -> "Q-Link", as the toggles; a
+# newer kit gave them "Toggle Switch" (Hz had the bug). Fixed here if it ever comes back; the list rows (shRow_*) keep the
+# kit's action (with "Q-Link" a tap on a row did nothing on the device). Anything else with the pattern fails the build.
+fixed = 0
+for d in t["pageData"]["componentDefinitions"]["localComponentDefinitions"]:
+    v = d["value"]
+    has_button = any(c["componentData"].get("type") == "Button" for c in v.get("componentsData", []))
+    for a in v.get("actions", []):
+        if has_button and a["onAction"] == "Mouse Down" and a["handler"] == "Toggle Switch":
+            if d["key"].startswith("shRow_"):
+                continue
+            if not d["key"].startswith("shTrig_"):
+                sys.exit("skin_post: %s switches twice per tap, and isn't a button or a row" % d["key"])
+            a["handler"] = "Q-Link"
+            fixed += 1
 json.dump(t, open(p, "w"), indent=1)
-print("skin_post: %d type roles set" % len(done))
+print("skin_post: %d type roles set; buttons switch once per tap (%d fixed)" % (len(done), fixed))

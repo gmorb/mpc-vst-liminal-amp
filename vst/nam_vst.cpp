@@ -128,6 +128,15 @@ struct Browser {
 };
 static const int kArmSeconds = 4;
 static const int kFullArmSeconds = 6;           // A2 FULL: time to read the warning and tap again
+// 1.1.0, from Liminal Hz 1.4.0's device tests (MPC OS 3.10): MPC can deliver one tap twice (or echo a toggle the plugin
+// sets back), ~130 ms apart. On a two-tap control that armed and confirmed on one touch (Hz's two-tap LONG IR came on
+// at the first tap). So on DELETE, My Presets' SAVE and DELETE, and A2 FULL a press within kTapMs of the previous event
+// on the same control is the same tap: ignored, and the control's value reported back.
+static const int kTapMs = 300;
+// UpdateDisplay pacing (notify(); Liminal Hz 1.4.0): MPC answers each UpdateDisplay by reading every parameter again and
+// rebuilding its screen. At most one per kDispGapMs; while a capture or IR loads one waits up to kDispHoldMs, so a pick
+// redraws once, with the new name.
+static const double kDispGapMs = 100, kDispHoldMs = 600;
 
 // ---- My Presets ------------------------------------------------------------------------------------------------------
 struct MyPresets {                          // all under mu
@@ -165,6 +174,10 @@ struct Inst {
   std::thread worker;
   std::atomic<int> changed[P_COUNT];        // report the value of these to the host (audio thread)
   std::atomic<int> update_display{0};
+  std::atomic<float> host_view[P_COUNT];        // each value as the host last had it (it wrote it, or was told): -1 unknown
+  std::chrono::steady_clock::time_point disp_last, disp_since;   // UpdateDisplay: last sent, first unsent request (audio thread)
+  bool disp_wait = false;                       // an UpdateDisplay is due (audio thread)
+  std::atomic<long long> tap_at[P_COUNT];       // kTapMs: the last host event on a guarded control (steady clock, ms)
   float tube_env = 0;                       // audio thread: the output's peak, held and released (tube-like)
   int tube_sent = 0, tube_age = 0;          // audio thread: the step last reported to the host, blocks since
   std::atomic<int> tube_step{0};            // the step the page shows (read by the host's display calls)
@@ -541,14 +554,18 @@ static void worker_main(Inst* w) {
       std::string err;
       const bool ok = Library::remove(victim, &err);       // permanent
       std::lock_guard<std::mutex> lk(w->mu);
-      if (ok) {
+      if (ok) {                                 // taken out of the list here: no walk of the cards ("Searching...")
         b->notice = "Deleted";
         b->notice_until = std::chrono::steady_clock::now() + std::chrono::seconds(3);
         b->error.clear();
-        b->loaded = LibEntry();                 // the next scan lands on the next file (same position)
-        w->scan_req = true;
-        w->work_req = true;
-        w->scanning = true;
+        b->loaded = LibEntry();
+        b->lib.erase(std::remove_if(b->lib.begin(), b->lib.end(), [&](const LibEntry& x) { return x.path == victim.path; }),
+                     b->lib.end());
+        if (b->want >= (int)b->lib.size()) b->want = b->lib.empty() ? -1 : 0;   // the next file (same position), as a rescan picked
+        requested(*b);
+        menu_clamp(w, *b);
+        browser_changed(w, b);
+        w->work_req = true;                     // load the next one
       } else {
         b->error = err;
       }
@@ -876,10 +893,20 @@ static void set_menu_param(Inst* w, int i, float v) {
   if (pick >= 0) mp_choose(w, pick);
 }
 
+static bool tap_guarded(int i) {
+  return i == P_MODEL_DELETE || i == P_IR_DELETE || i == P_MP_SAVE || i == P_MP_DELETE || i == P_FULL;
+}
+
 static void set_param(Inst* w, int32_t i, float v, bool trusted) {
   if (i < 0 || i >= P_COUNT) return;
   v = clamp01(v);
   if (is_display(i)) return;                     // read-only: the host cannot move the tubes, the print or the preset name
+  if (!trusted && tap_guarded(i)) {              // kTapMs: one touch delivered twice is one tap
+    const long long now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    const long long prev = w->tap_at[i].exchange(now);
+    if (v >= 0.5f && now - prev < kTapMs) { w->changed[i] = 1; return; }   // the same tap: the host gets the value back
+  }
   if (is_mp(i)) { set_mp_param(w, i, v); return; }
   if (is_menu(i)) { if (i != MI[menu_which(i)].menu && i != MI[menu_which(i)].title) set_menu_param(w, i, v); return; }
   Browser* b = browser_of(w, i);
@@ -1016,7 +1043,11 @@ static void set_param(Inst* w, int32_t i, float v, bool trusted) {
   if (!browse.empty()) open_tones(w, browse);
 }
 
-static void set_parameter(AEffect* e, int32_t i, float v) { set_param((Inst*)e->object, i, v, false); }
+static void set_parameter(AEffect* e, int32_t i, float v) {
+  Inst* w = (Inst*)e->object;
+  if (i >= 0 && i < P_COUNT) w->host_view[i] = clamp01(v);   // what the host now shows (notify() tells it when that changes)
+  set_param(w, i, v, false);
+}
 
 // 1.1.0: buttons that act (DELETE above all, RESCAN, the phone pages, file steps) and read-only text lines are not
 // automatable: MPC OS 3.10.1's host honours this, so an automation lane can never press DELETE. The sound controls,
@@ -1080,7 +1111,19 @@ static void notify(Inst* w) {                    // audio thread: report values 
       w->master(&w->fx, audioMasterAutomate, P_TUBES, 0, nullptr, k / (float)kTubeSteps);
     }
   }
-  const bool disp = w->update_display.exchange(0);
+  const auto now = std::chrono::steady_clock::now();
+  if (w->update_display.exchange(0) && !w->disp_wait) { w->disp_wait = true; w->disp_since = now; }
+  bool disp = false;
+  if (w->disp_wait) {
+    auto ms = [&](std::chrono::steady_clock::time_point t) { return std::chrono::duration<double, std::milli>(now - t).count(); };
+    bool loading = true;                         // (unknown while the lock is busy: treated as loading)
+    {
+      std::unique_lock<std::mutex> lk(w->mu, std::try_to_lock);   // never wait on the audio thread
+      if (lk.owns_lock()) loading = w->model.loading || w->ir.loading;
+    }
+    disp = ms(w->disp_last) >= kDispGapMs && (!loading || ms(w->disp_since) >= kDispHoldMs);
+  }
+  if (disp) { w->disp_wait = false; w->disp_last = now; }
   if (disp) {
     for (int k = 0; k < 2; k++) {
       if (!(k == 0 ? w->model : w->ir).menu_open.load()) continue;   // a list is open: its title and rows are read again
@@ -1101,6 +1144,10 @@ static void notify(Inst* w) {                    // audio thread: report values 
     }
     if (is_menu(i) && i == MI[menu_which(i)].menu) v = (float)(menu_which(i) ? w->ir : w->model).menu_open.load() / (float)(PARAMS[i].nopts - 1);
     if (i == P_PRESET) v = 0;
+    // (values go at once: knobs move without waiting.) While a redraw is due, a value the host already has isn't sent:
+    // the redraw reads its text again
+    if ((disp || w->disp_wait) && v == w->host_view[i].load()) continue;
+    w->host_view[i] = v;
     w->master(&w->fx, audioMasterAutomate, i, 0, nullptr, v);
   }
   if (disp) w->master(&w->fx, audioMasterUpdateDisplay, 0, 0, nullptr, 0);
@@ -1337,7 +1384,11 @@ static bool set_chunk(Inst* w, const char* data, size_t len) {
   w->mp.want = -1;
   for (int k = 0; k < (int)w->mp.list.size(); k++) if (!mp_name.empty() && ieq(w->mp.list[k].name, mp_name)) w->mp.want = k;
   kick(w, !w->scanned);
-  for (int i = 0; i < P_COUNT; i++) w->changed[i] = 1;
+  // a project's state arming nothing (Liminal Hz 1.4.1): DELETE and A2 FULL wait for a new first tap. (Hz also closes its
+  // lists here; Amp's list state is a parameter, which Akai's host_sim expects a project load to leave as it was, and a
+  // project opens in a new instance, with its lists closed, anyway.)
+  w->model.armed_path.clear(); w->ir.armed_path.clear(); w->mp.armed_name.clear(); w->full_armed_until = {};
+  for (int i = 0; i < P_COUNT; i++) { w->changed[i] = 1; w->host_view[i] = -1.0f; }   // (all reported again)
   w->update_display = 1;
   return true;
 }
@@ -1413,6 +1464,8 @@ extern "C" __attribute__((visibility("default"))) AEffect* VSTPluginMain(audioMa
   w->master = master;
   for (int i = 0; i < P_COUNT; i++) {
     w->changed[i] = 0;
+    w->host_view[i] = -1.0f;
+    w->tap_at[i] = -1000000;
     if (is_wave(i)) w->wave[i - P_WAVE1] = 0;
     const param_t& p = PARAMS[i];
     w->norm[i] = p.def;                          // params.h: defaults already normalised

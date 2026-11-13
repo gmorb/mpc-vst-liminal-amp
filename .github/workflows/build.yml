@@ -1,5 +1,5 @@
 # Build and test Liminal Amp; for a v* tag, make a DRAFT release with the zips (test on a device, then publish).
-# Release files: Liminal-Amp-<v>-mpc-sdk.zip (MPC OS 3.10.1+, one folder for every MPC: copy into "VST2 Plugins"),
+# Release files: Liminal-Amp-<v>-MPC-OS-3.10.1.zip (MPC OS 3.10.1+, one folder for every MPC: copy into "VST2 Plugins"),
 # Liminal-Amp-<v>-mpc-armv7.zip / -mpc-aarch64.zip (the MPC OS Plugin Catalog's packages), SHA256SUMS.
 name: build
 
