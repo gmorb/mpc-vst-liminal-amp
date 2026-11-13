@@ -3,7 +3,7 @@
 ## 1.1.0
 - **MPC OS 3.10.1 and later: one folder for every MPC.** MPC OS 3.10.1 loads third-party plugins officially from a
   `VST2 Plugins` folder on any drive (Preferences → Enhancements (Beta) → Enable Enhancements and External Plugin
-  Support), with no root access. The new release file `Liminal-Amp-<v>-MPC-OS-3.10.1.zip` (named as Liminal Hz's) is Liminal Amp in Akai's plugin folder
+  Support), with no root access. The new release file `Liminal-Amp-<v>-mpc-sdk.zip` is Liminal Amp in Akai's plugin folder
   format: `plugin.json` with both builds (`liminal_amp-arm32.so` for the Force and 32-bit MPCs, `liminal_amp-arm64.so`
   for the MPC Live III and MPC XL), `version.xml` with the UI version the MPC's skins need (0.1.0.0), the page, licences
   and a README with the steps. Checked with Akai's MPC Plugin SDK on every build (`tools/akai_check.sh`): `validate.py`
@@ -40,6 +40,7 @@
 - The README in the plugin folder is rewritten for 3.10.1 (it still said GET TONES for the phone page and that a stereo
   IR is refused; both were out of date).
 - Restored `tested.json` and NAM Core's vendored `NAM/json.hpp`, both removed by mistake in the 1.0.2 commit.
+- Tested on real hardware on MPC OS 3.10.1: an Akai Force (32-bit) and an MPC Live III (64-bit).
 - Nothing about the sound changes: same engine, controls, presets and project format. Projects and presets from 1.0.x open
   as they were.
 

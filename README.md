@@ -155,10 +155,11 @@ be any sample rate; a stereo IR is mixed down to mono. The plugin remembers wher
 **RESCAN** are quick even on a full card.
 
 ## Install
-**MPC OS 3.10.1 and later (every MPC and Force):** download **`Liminal-Amp-<version>-MPC-OS-3.10.1.zip`** from
+**MPC OS 3.10.1 and later (every MPC and Force):** download **`Liminal-Amp-<version>-mpc-sdk.zip`** from
 [Releases](../../releases). It holds one folder, `Gm0rb - VST - Liminal Amp`, with both builds: 32-bit for the Force,
 MPC X, X SE, Live, Live II, One, One+, Key 61 and Key 37, and 64-bit for the MPC Live III and MPC XL (its `plugin.json`
-tells each MPC which to load). No root access or scripts.
+tells each MPC which to load). No root access or scripts. Tested on real hardware on MPC OS 3.10.1: an Akai Force and an
+MPC Live III (`tested.json` lists each test).
 
 1. On the MPC: **Preferences → Enhancements (Beta)**, turn on **Enable Enhancements** and **External Plugin Support**.
 2. Unzip, and copy the `Gm0rb - VST - Liminal Amp` folder into a folder named exactly **`VST2 Plugins`** at the root of a

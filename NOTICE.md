@@ -23,7 +23,7 @@ generator, Q-Link maps). At that commit that repository states no licence of its
 tools are MIT (Copyright (c) 2026 sd88me).
 
 ## TONE3000
-GET TONES uses the TONE3000 API (https://www.tone3000.com/api) under its API Terms of Service, Design Requirements and
+BROWSE TONE3000 uses the TONE3000 API (https://www.tone3000.com/api) under its API Terms of Service, Design Requirements and
 Commercial Terms, as a free, open-source integration (free tier: the Select flow). Captures and IRs downloaded from
 TONE3000 belong to their creators and carry their own licences; each download's `tone3000.json` records them.
 

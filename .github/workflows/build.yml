@@ -1,5 +1,5 @@
 # Build and test Liminal Amp; for a v* tag, make a DRAFT release with the zips (test on a device, then publish).
-# Release files: Liminal-Amp-<v>-MPC-OS-3.10.1.zip (MPC OS 3.10.1+, one folder for every MPC: copy into "VST2 Plugins"),
+# Release files: Liminal-Amp-<v>-mpc-sdk.zip (MPC OS 3.10.1+, one folder for every MPC: copy into "VST2 Plugins"),
 # Liminal-Amp-<v>-mpc-armv7.zip / -mpc-aarch64.zip (the MPC OS Plugin Catalog's packages), SHA256SUMS.
 name: build
 
@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 env:
-  MPC_VST_REPO: sd88me/mpc-vst-plugins          # page generator and plugin-list entry (pinned: the page tested on a device)
+  MPC_VST_REPO: open-mpc/mpc-vst-plugins        # (was sd88me/mpc-vst-plugins: moved, same history) page generator and plugin-list entry (pinned: the page tested on a device)
   MPC_VST_REF: 3e50b052268d81e6c61a17a1390ced62f0fdff74
   MPC_VST_RELEASE_REF: 009353816044739537adab030927fe9765af67f1   # release.py, catalog_check.py, sdk_zip.py: plugin.json (MPC OS 3.10.1), Gen 2
   AKAI_SDK_REPO: inmusic-software/mpc-plugin-builder-sdk           # Akai's MPC Plugin SDK: host_sim and validate.py check the 3.10.1 folder
