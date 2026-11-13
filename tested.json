@@ -37,5 +37,17 @@
       "verdict": "PASS",
       "test_conditions": "48 kHz, 128-frame blocks (Akai MPC Live 3)"
     }
+  },
+  {
+    "version": "1.1.0",
+    "device": "Akai Force (Gen1)",
+    "firmware": "3.10.1",
+    "date": "2026-11-13"
+  },
+  {
+    "version": "1.1.0",
+    "device": "MPC Live 3 (Gen2)",
+    "firmware": "3.10.1",
+    "date": "2026-11-13"
   }
 ]
