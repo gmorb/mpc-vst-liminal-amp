@@ -47,6 +47,7 @@ class Library {
   // MPCNAM_MEDIA overrides it, for tests)
   static std::string plugin_dir();
   static std::string media_root();
+  static std::vector<std::string> media_roots();   // media_root() plus /nvme (MPC Live III); MPCNAM_MEDIA replaces both
 
   // the entry to use for something saved as (path, display, file): exact path, else the same relative display
   // path in any library folder, else the same file name; -1 if none

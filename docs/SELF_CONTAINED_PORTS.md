@@ -1,5 +1,8 @@
 # Self-contained ports: one folder per plugin
 
+> **History (before 1.1.0).** This describes the Force VST distribution route on modded firmware (`vstscanner.sh`),
+> which Liminal Amp no longer ships. On MPC OS 3.10.1 and later, plugins go in a `VST2 Plugins` folder: see the README.
+
 How MPC OS plugin ports are packaged so that **everything a plugin needs lives in one folder**, why that works, why
 it beats the older install method, and how to do it for every new port.
 

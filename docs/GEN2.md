@@ -1,48 +1,43 @@
-# Liminal Amp on Gen 2 devices (64-bit ARM: MPC Live III and kin, RK3588 / RK3588S)
+# Liminal Amp on 64-bit MPCs (MPC Live III, MPC XL: RK3588 / RK3588S)
 
-Gen 2 MPCs run a 64-bit MPC program, so a 32-bit (Gen 1) plugin can't load there. Liminal Amp has a second build for
-them, `Liminal-Amp-<version>-mpc-aarch64.zip`, on the same release as the Gen 1 zip. This follows the build kit's Gen 2
-design ([mpc-vst-plugins docs/GEN2.md](https://github.com/sd88me/mpc-vst-plugins/blob/main/docs/GEN2.md)).
+64-bit MPCs run a 64-bit MPC program, so they need a 64-bit build of the plugin. Liminal Amp has one, built from the
+same source: same page, parameters, uid, projects and presets (saved projects move between the two kinds of MPC).
 
-**Status: built and tested under 64-bit ARM emulation only.** The whole plugin test (plugin_test) and the cab IR's FFT
-against the official convolution (ir_test) pass under qemu-aarch64; nobody has loaded Liminal Amp on a Gen 2 device yet.
-The kit's route itself is proven on a real MPC Live III (MPC OS 5.0.18) with two other plugins (2026-10-11).
+## MPC OS 3.10.1 and later: nothing special
+Since 1.1.0 the release's **`Liminal-Amp-<version>-mpc-sdk.zip`** is one plugin folder for every MPC, in Akai's plugin
+folder format: `plugin.json` names `liminal_amp-arm32.so` (`file32`) and `liminal_amp-arm64.so` (`file64`), and each MPC
+loads its own. Copy the folder into `<drive>/VST2 Plugins/` and turn on **Preferences → Enhancements (Beta) → Enable
+Enhancements** and **External Plugin Support** (see the README). No root access is needed.
 
-## What's in the Gen 2 zip
-- The same plugin: same page, parameters, uid, projects and presets (saved projects move between generations).
-- Built for 64-bit ARM: Armv8.2-A as the RK3588's Cortex-A55 cores run it (the A76 cores run it too), glibc 2.17 or
-  newer (Gen 2 has 2.39), the C++ runtime built in. NEON throughout, including the cab IR's FFT (as the Gen 1 build since
-  1.0.2). Both generations make the same sound with the same options; Gen 2 is just faster hardware.
-- Its manifest says `arch: aarch64`, so the zip's `install.sh` refuses to run on a 32-bit device and registers the plugin
-  in MPC's 64-bit plugin list (`pluginList-arm-64bit`, confirmed on an MPC Live III by the kit).
-- No CPU figure: the release's bench result is from a Gen 1 Force.
+The plugin also looks for `models` and `irs` folders on the Live III's internal drive, `/nvme`, which isn't under `/media`.
 
-## Install
-You need root (SSH) on the device. This project doesn't provide a Gen 2 root route; the kit's Gen 2 testers had root by
-other means.
-- **From the MPC OS Plugin Catalog:** its installer takes the aarch64 zip on an aarch64 device automatically.
-- **By hand:** copy `Liminal-Amp-<version>-mpc-aarch64.zip` to the device, unzip it and run its `install.sh` (see its
-  `INSTALL.md`). On the kit's MPC Live III the target had to be a removable card's Synths folder (`-t /media/<label>/Synths`):
-  `/sdcard` wasn't mounted and the internal Synths folder was read-only.
+## Older firmware (MPC OS 3.9.x, modded)
+`Liminal-Amp-<version>-mpc-aarch64.zip` is the MPC OS Plugin Catalog's 64-bit package. Its manifest says
+`arch: aarch64`, so its `install.sh` refuses a 32-bit device and registers the plugin in MPC's 64-bit plugin list
+(`pluginList-arm-64bit`). It needs root (SSH), and on the kit's Live III the target had to be a removable card's Synths
+folder (`-t /media/<label>/Synths`). This follows the build kit's Gen 2 design
+([mpc-vst-plugins docs/GEN2.md](https://github.com/sd88me/mpc-vst-plugins/blob/main/docs/GEN2.md)).
 
-## Build, test, package
+## The build
+- Armv8.2-A as the RK3588's Cortex-A55 cores run it (the A76 cores run it too), glibc 2.17 or newer (MPC OS 3 has 2.39),
+  the C++ runtime built in, NEON throughout including the cab IR's FFT (the 32-bit build too since 1.0.2).
+- Tested: the whole plugin test (plugin_test), the cab IR's FFT against the official convolution (ir_test) and Akai's
+  host simulator (`tools/akai_check.sh`, ARM=1) under qemu-aarch64 on every build. `tested.json` records 1.0.1 on an MPC
+  Live 3 (MPC OS 3.9.1).
+
 ```
 vst/build.sh aarch64          # vst/build/aarch64/liminal_amp.so (Zig; checks exports and glibc)
 ARM64=1 tools/test.sh         # plugin_test and ir_test under qemu-aarch64 (qemu-user, libc6-arm64-cross)
-MPC_VST_RELEASE=<newer kit> REPO=gmorb/mpc-vst-liminal-amp tools/package.sh   # + dist/Liminal-Amp-<v>-mpc-aarch64.zip
 ```
-`MPC_VST_RELEASE` must be a kit whose `release.py` knows Gen 2 (CI pins one: `.github/workflows/build.yml`). The page is
-still built with the pinned `MPC_VST`, so both generations get the same tested page.
 
-## Measure it (once a Gen 2 device is reachable)
+## Measure it
 ```
-SO_FILE=vst/build/aarch64/liminal_amp.so tools/bench_device.sh <device-ip>
+SO_FILE=<the 64-bit liminal_amp .so> tools/bench_device.sh <device-ip>
 ```
-It builds the catalog's bench for 64-bit ARM, runs it safely in /tmp on copies of one capture and one IR, and writes
-`bench/bench-<version>-aarch64.json` (not put into the release: the catalog's figure is Gen 1's). Never run the kit's
-`tools/bench.sh` against this plugin directly: its parameter sweep can press DELETE.
+It needs SSH on the device. It builds the catalog's bench for 64-bit ARM, runs it safely in /tmp on copies of one capture
+and one IR, and writes `bench/bench-<version>-aarch64.json`. Never run the kit's `tools/bench.sh` against this plugin
+directly: its parameter sweep can press DELETE.
 
 ## Tested on
-Once it has run on a Gen 2 device, add a `tested.json` entry whose device names it with "Gen2", e.g.
-`{"version": "1.0.2", "device": "MPC Live III (Gen2)", "firmware": "5.0.18", "date": "..."}`: the catalog marks
-the version "Gen2 · tested" only then.
+Add a `tested.json` entry whose device names it with "Gen2", e.g.
+`{"version": "1.1.0", "device": "MPC Live III (Gen2)", "firmware": "3.10.1", "date": "..."}`.

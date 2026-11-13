@@ -30,6 +30,11 @@ rm -rf "$B/skin"
 # draws real Titillium text, the TONE3000 logo and the T3K mark; SHADOW_ART would override it, so it isn't set
 python3 "$MPC_VST/tools/gen_vst.py" vst/vst.json
 python3 vst/skin_post.py "$B/skin/Gm0rb - VST - Liminal Amp/Plugin Skins"     # the live-text sizes and colours
+# version.xml as MPC OS 3.10.1 reads it (Akai's plugin-folder-format.md): the plugin's version, and <uiversion> 0.1.0.0,
+# the MPC's scripted-UI version (Akai's validate.py warns the skins may be ignored without it; never write "1")
+printf '%s\n' "<?xml version='1.0' encoding='utf-8'?>" '<plugincontent version="1.0">' \
+  '	<identifier>Gm0rb.vst.liminalamp</identifier>' "	<version>$(cut -d. -f1-3 VERSION).0</version>" \
+  '	<uiversion>0.1.0.0</uiversion>' '</plugincontent>' > "$B/skin/Gm0rb - VST - Liminal Amp/version.xml"
 sed -i -e 's/category="Synth"/category="Effect"/' -e 's/isInstrument="1"/isInstrument="0"/' \
        -e 's/numInputs="0"/numInputs="2"/' "$B/pluginlist-entry.xml"
 
@@ -87,6 +92,16 @@ if [ "$MODE" = aarch64 ]; then
   # PFFFT_ENABLE_NEON: PFFFT only uses NEON when asked (otherwise it builds its scalar code)
   build "$B/aarch64" "$ZIG cc $TGT" "$ZIG c++ $TGT" "-DPFFFT_ENABLE_NEON" "-Wl,-s -Wl,--no-undefined -lpthread"
   check_so "$B/aarch64/liminal_amp.so" GLIBC_2.17
+  exit 0
+fi
+
+if [ "$MODE" = zighost ]; then
+  # the device builds' toolchain (Zig, its static libc++) for this PC: Akai's host_sim runs it natively, so problems
+  # that only the device's C++ runtime shows (e.g. at unload) are caught without emulation (tools/akai_check.sh)
+  ZIG="${ZIG:-python3 -m ziglang}"
+  TGT="-target x86_64-linux-gnu.2.31"
+  build "$B/zighost" "$ZIG cc $TGT" "$ZIG c++ $TGT" "-g" "-Wl,--no-undefined -lpthread"
+  echo "zig PC plugin: $B/zighost/liminal_amp.so"
   exit 0
 fi
 

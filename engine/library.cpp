@@ -29,12 +29,24 @@ static std::string lower(std::string s) {
   return s;
 }
 
+static bool is_file(const std::string& p) {
+  struct stat st;
+  return stat(p.c_str(), &st) == 0 && S_ISREG(st.st_mode);
+}
+
+// The plugin's folder: the folder of liminal_amp.so (the catalog layout, and MPC OS 3.10.1's VST2 Plugins folder as we
+// ship it), or its parent when the .so sits in a VST/ subfolder next to plugin.json (the layout Akai's SDK builds).
 std::string Library::plugin_dir() {
   Dl_info info;
   if (dladdr(reinterpret_cast<void*>(&Library::plugin_dir), &info) && info.dli_fname) {
     std::string p = info.dli_fname;
     size_t slash = p.find_last_of('/');
-    return slash == std::string::npos ? std::string(".") : p.substr(0, slash);
+    if (slash == std::string::npos) return ".";
+    std::string dir = p.substr(0, slash);
+    const size_t s2 = dir.find_last_of('/');
+    if (s2 != std::string::npos && !is_file(dir + "/plugin.json") && is_file(dir.substr(0, s2) + "/plugin.json"))
+      dir = dir.substr(0, s2);
+    return dir;
   }
   return "";
 }
@@ -42,6 +54,20 @@ std::string Library::plugin_dir() {
 std::string Library::media_root() {
   const char* e = std::getenv("MPCNAM_MEDIA");
   return (e && *e) ? e : "/media";
+}
+
+// Every drive root to search: /media (cards, USB drives, Gen 1's internal drive) and /nvme (the MPC Live III's
+// internal drive, not under /media). MPCNAM_MEDIA (tests) replaces both.
+std::vector<std::string> Library::media_roots() {
+  const char* e = std::getenv("MPCNAM_MEDIA");
+  if (e && *e) return {e};
+  return {"/media", "/nvme"};
+}
+
+static std::string roots_key() {                   // the index is only valid for the roots it was made with
+  std::string k;
+  for (const std::string& r : Library::media_roots()) k += (k.empty() ? "" : ":") + r;
+  return k;
 }
 
 enum Kind { NONE, DIR_, FILE_ };
@@ -209,7 +235,7 @@ static std::vector<std::string> read_index(const std::string& folder) {
     lines.push_back(text.substr(i, e - i));
     i = e + 1;
   }
-  if (lines.size() < 2 || lines[0] != kIndexMagic || lines[1] != "media=" + Library::media_root()) return dirs;
+  if (lines.size() < 2 || lines[0] != kIndexMagic || lines[1] != "media=" + roots_key()) return dirs;
   for (size_t i = 2; i < lines.size(); i++) {
     // only a folder that is still there and still has the right name
     const std::string& d = lines[i];
@@ -223,7 +249,7 @@ static std::vector<std::string> read_index(const std::string& folder) {
 static void write_index(const std::string& folder, const std::vector<std::string>& dirs) {
   const std::string path = index_path(folder);
   if (path.empty()) return;
-  std::string text = std::string(kIndexMagic) + "\nmedia=" + Library::media_root() + "\n";
+  std::string text = std::string(kIndexMagic) + "\nmedia=" + roots_key() + "\n";
   for (const std::string& d : dirs) text += d + "\n";
   FILE* old = fopen(path.c_str(), "r");            // unchanged: don't touch the card
   if (old) {
@@ -271,8 +297,8 @@ static std::vector<std::string> own_dirs(const std::string& folder) {
 
 std::vector<LibEntry> Library::scan(const std::string& folder, const std::string& ext) {
   std::vector<std::string> dirs = own_dirs(folder);
-  const std::string media = media_root();
-  if (kind_of(media) == DIR_) find_dirs(media, folder, 0, kSearchDepth, dirs);
+  for (const std::string& media : media_roots())
+    if (kind_of(media) == DIR_) find_dirs(media, folder, 0, kSearchDepth, dirs);
   const std::vector<std::string> uniq = unique_dirs(dirs);
   write_index(folder, uniq);                       // for the next start's scan_quick
   return list_dirs(uniq, ext);

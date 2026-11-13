@@ -494,3 +494,31 @@ with Crate Digger and Profit-08, 2026-10-11); aarch64 glibc ceiling 2.39; tested
 - Needs: a Force bench of 1.0.2 (tools/bench_device.sh with SO_FILE from the release's armv7 zip) to record the lower figure.
 - NOTICE.md's kit commit corrected to the pinned 3e50b05.
 
+## 2026-11-12: 1.1.0, MPC OS 3.10.1 (Akai's MPC Plugin SDK)
+- MPC OS 3.10.1 loads plugins officially from `<drive>/VST2 Plugins/<Manufacturer> - VST - <Name>/` with a `plugin.json`
+  (inmusic-software/mpc-plugin-builder-sdk at febd2ca, MIT; docs/plugin-folder-format.md, host-contract.md). Same VST2
+  ABI and skin format as before, so no port to Akai's `mpc::Plugin` framework was needed: the release gains
+  `Liminal-Amp-<v>-mpc-sdk.zip`, made by the kit's `tools/sdk_zip.py` (release tools pinned at 0093538) from the two catalog
+  zips, whose folders now carry a plugin.json too (the kit's newer release.py). The .so files stay at the folder root
+  (`liminal_amp-arm32.so` / `-arm64.so`), as the kit does: `Library::plugin_dir()` is the .so's folder (now also its
+  parent when the .so is in `VST/` next to plugin.json).
+- `tools/akai_check.sh`: Akai's host_sim (load sequence, param-0 nudge, in-place, state, sweep, teardown + dlclose) on
+  the GCC and Zig PC builds at blocks 128/32/512/100, ARM=1 on both device binaries under qemu (host_sim cross-built with
+  Zig), then validate.py on the folder. Allowed: host_sim's "set x but getParameter returned y" on switches/choices (our
+  one-step nudge for in-between values, from the kit; device-tested Q-Link behaviour). In CI.
+- **Bug found by host_sim:** SIGSEGV after effClose, at the host's exit: Zig's shared-library link doesn't call
+  `__cxa_finalize(&__dso_handle)` at dlclose (GCC's crtbeginS does), so the plugin's static destructors (NAM's activation
+  tables, libc++ iostreams) stayed registered and ran from unmapped code. Fix: a `__attribute__((destructor))` that calls
+  `__cxa_finalize(&__dso_handle)` (vst/nam_vst.cpp). `vst/build.sh zighost` reproduces device-toolchain issues natively.
+- effCanBeAutomated: action buttons and text lines answer no (`is_action`): DELETE can't be automated on 3.10.1.
+- version.xml (written by vst/build.sh): `<version>` from VERSION and `<uiversion>0.1.0.0</uiversion>` (validate.py
+  warned the MPC may ignore the skins without it).
+- Search roots: `/media` and `/nvme` (Live III internal drive); MPCNAM_MEDIA still replaces both. Index key changes once.
+- Page: pixel-identical to 1.0.2's (compared against the v1.0.2 release zip; only one knob strip's file name differs).
+- The 1.0.2 commit had deleted tested.json and src/nam-core/NAM/json.hpp (the agent removed files missing from the repo
+  zip): restored. Lesson: build the hand-over zip from `git ls-files`, not from a local tree.
+- Dropped the Force VST distribution zip (vstscanner). Releases: -mpc-sdk.zip (3.10.1+), -mpc-armv7/-aarch64.zip (catalog).
+- Not yet done on hardware: loading the 3.10.1 folder on a device running 3.10.1 (the owner's Force, then a Live III).
+  The network page (TONE3000) and libcurl on stock 3.10.1 are unknowns: libcurl is dlopen'ed and its absence shows
+  "Needs libcurl" (everything else works).
+

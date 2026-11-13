@@ -1018,6 +1018,20 @@ static void set_param(Inst* w, int32_t i, float v, bool trusted) {
 
 static void set_parameter(AEffect* e, int32_t i, float v) { set_param((Inst*)e->object, i, v, false); }
 
+// 1.1.0: buttons that act (DELETE above all, RESCAN, the phone pages, file steps) and read-only text lines are not
+// automatable: MPC OS 3.10.1's host honours this, so an automation lane can never press DELETE. The sound controls,
+// the capture / IR choice, ECO, A2 FULL and the pack steps (on Q-Links) stay automatable.
+static bool is_action(int i) {
+  switch (i) {
+    case P_MODEL_PREV: case P_MODEL_NEXT: case P_MODEL_INFO: case P_IR_PREV: case P_IR_NEXT: case P_IR_INFO:
+    case P_RESCAN: case P_GET_TONES: case P_T3K_INFO: case P_MODEL_PACK: case P_MODEL_SRC: case P_MODEL_BROWSE:
+    case P_IR_PACK: case P_IR_SRC: case P_IR_BROWSE: case P_MODEL_DELETE: case P_IR_DELETE:
+      return true;
+    default:
+      return false;
+  }
+}
+
 static float get_parameter(AEffect* e, int32_t i) {
   Inst* w = (Inst*)e->object;
   if (i < 0 || i >= P_COUNT) return 0;
@@ -1355,7 +1369,8 @@ static intptr_t dispatcher(AEffect* e, int32_t op, int32_t idx, intptr_t v, void
     case effGetVendorString: strncpy((char*)p, PLUG_VENDOR, 31); ((char*)p)[31] = 0; return 1;
     case effGetVendorVersion: return PLUG_VERSION;
     case effGetVstVersion: return 2400;
-    case effCanBeAutomated: return idx >= 0 && idx < P_COUNT && !is_menu(idx) && !is_display(idx) && !is_mp(idx);
+    case effCanBeAutomated: return idx >= 0 && idx < P_COUNT && !is_menu(idx) && !is_display(idx) && !is_mp(idx) &&
+                                   !is_action(idx);
     case effGetParamName:
       if (idx >= 0 && idx < P_COUNT) { strncpy((char*)p, PARAMS[idx].name, 31); ((char*)p)[31] = 0; }
       return 1;
@@ -1381,6 +1396,16 @@ static intptr_t dispatcher(AEffect* e, int32_t op, int32_t idx, intptr_t v, void
     default: return 0;
   }
 }
+
+// 1.1.0: run the library's static destructors when the host unloads it (dlclose), not at the host's exit. A shared
+// library's exit handlers (C++ statics: NAM's activation tables, libc++'s streams) are registered with __cxa_atexit
+// under its __dso_handle; GCC's startup files call __cxa_finalize(&__dso_handle) at unload, but the Zig toolchain
+// the device builds use does not, so the handlers stayed registered and ran at the MPC's exit after the code was
+// unmapped: a crash (Akai's host_sim: SIGSEGV after effClose). Running them here, once, at unload removes them.
+// A second call (the GCC PC build, whose startup file also calls it) finds nothing left to run.
+extern void* __dso_handle;                // as GCC declares it itself (a global variable's name isn't mangled)
+extern "C" void __cxa_finalize(void*);
+__attribute__((destructor)) static void finalize_on_unload() { __cxa_finalize(&__dso_handle); }
 
 extern "C" __attribute__((visibility("default"))) AEffect* VSTPluginMain(audioMasterCallback master) {
   Inst* w = new (std::nothrow) Inst();

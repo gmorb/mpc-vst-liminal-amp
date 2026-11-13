@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.1.0
+- **MPC OS 3.10.1 and later: one folder for every MPC.** MPC OS 3.10.1 loads third-party plugins officially from a
+  `VST2 Plugins` folder on any drive (Preferences → Enhancements (Beta) → Enable Enhancements and External Plugin
+  Support), with no root access. The new release file `Liminal-Amp-<v>-mpc-sdk.zip` is Liminal Amp in Akai's plugin folder
+  format: `plugin.json` with both builds (`liminal_amp-arm32.so` for the Force and 32-bit MPCs, `liminal_amp-arm64.so`
+  for the MPC Live III and MPC XL), `version.xml` with the UI version the MPC's skins need (0.1.0.0), the page, licences
+  and a README with the steps. Checked with Akai's MPC Plugin SDK on every build (`tools/akai_check.sh`): `validate.py`
+  passes with no errors or warnings, and its host simulator passes on the PC builds (block sizes 32, 100, 128, 512) and
+  on both device binaries under emulation.
+- **Fixed: a crash when the plugin library is unloaded** (found by Akai's host simulator). The device builds' toolchain
+  (Zig) left the library's C++ static destructors registered after unload, so they ran at the MPC application's exit
+  from unmapped code. The plugin now runs them itself at unload. A `vst/build.sh zighost` build (the same toolchain for
+  the PC) keeps this tested without emulation.
+- **Buttons that act are no longer automatable** (DELETE, RESCAN, BROWSE TONE3000 / GET TONES, the file arrows and the
+  text lines): MPC OS 3.10.1 honours this, so an automation lane can never press DELETE. The sound controls, the capture
+  and IR choice, ECO, A2 FULL and the pack steps stay automatable.
+- **The MPC Live III's internal drive** (`/nvme`) is searched for `models` and `irs` folders too. The fast-start index
+  is rebuilt once after the update.
+- The plugin finds its own folder in either layout (the `.so` at the folder root, as shipped, or in a `VST/` subfolder
+  next to `plugin.json`, as Akai's SDK builds it).
+- The catalog packages (`-mpc-armv7.zip`, `-mpc-aarch64.zip`) carry the same `plugin.json`, so they work on 3.10.1 too,
+  and keep their `install.sh` for older modded firmware. The old Force VST distribution zip
+  (`Liminal-Amp-for-MPC-OS-<v>.zip`, vstscanner) is no longer made: the 3.10.1 folder replaces it.
+- The README in the plugin folder is rewritten for 3.10.1 (it still said GET TONES for the phone page and that a stereo
+  IR is refused; both were out of date).
+- Restored `tested.json` and NAM Core's vendored `NAM/json.hpp`, both removed by mistake in the 1.0.2 commit.
+- Nothing about the sound changes: same engine, controls, presets and project format. Projects and presets from 1.0.x open
+  as they were.
+
 ## 1.0.2
 - Gen 1 (Force, MPC Live / Live II / One / X / Key 61) now runs the cab IR's FFT with NEON, as the Gen 2 build does.
   Before, the Gen 1 build compiled PFFFT's scalar code (PFFFT only uses NEON when asked, and the Gen 1 build never

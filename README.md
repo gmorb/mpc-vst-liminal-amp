@@ -4,7 +4,7 @@
 
 *A NAM A2 head and IR cab for MPC.*
 
-**A lightweight, official-sound Neural Amp Modeler for Gen 1 Akai MPC and Force.** One job, done faithfully: run
+**A lightweight, official-sound Neural Amp Modeler for Akai MPC and Force (MPC OS 3.10.1 and later, every model).** One job, done faithfully: run
 [Neural Amp Modeler](https://github.com/sdatkinson/NeuralAmpModelerCore) A2 captures through a noise gate, the official
 tone stack and a cabinet IR, as the official NAM plugin processes them, at the lowest CPU cost we could measure. Browse
 your captures and IRs on the touchscreen, download more from TONE3000 from your phone, and keep your rigs as **My
@@ -149,28 +149,33 @@ to 30-34% with a real TONE3000 A2 capture and an IR, and to **27-29% with Eco on
 
 ## Your own captures and IRs
 Put `.nam` captures in a folder named `models` and `.wav` IRs in a folder named `irs`: inside the plugin folder, or
-anywhere on the MPC's drives and cards (for example `/media/662522/models`), in packs (subfolders) if you like. IRs may
+anywhere on the MPC's drives and cards, up to four folders deep (USB drives and SD cards, the internal drive, and the
+MPC Live III's internal `/nvme` drive), in packs (subfolders) if you like. IRs may
 be any sample rate; a stereo IR is mixed down to mono. The plugin remembers where it found them, so starting up and
 **RESCAN** are quick even on a full card.
 
 ## Install
-Download `Liminal-Amp-for-MPC-OS-<version>.zip` from [Releases](../../releases). Requires SSH access
-(modded firmware) and the `Synths` folder with `vstscanner.sh` from the Force VST plugins distribution.
-For the **Akai Force with MockbaMod** (memory card at `/media/662522`):
+**MPC OS 3.10.1 and later (every MPC and Force):** download **`Liminal-Amp-<version>-mpc-sdk.zip`** from
+[Releases](../../releases). It holds one folder, `Gm0rb - VST - Liminal Amp`, with both builds: 32-bit for the Force,
+MPC X, X SE, Live, Live II, One, One+, Key 61 and Key 37, and 64-bit for the MPC Live III and MPC XL (its `plugin.json`
+tells each MPC which to load). No root access or scripts.
 
-1. Copy the `Gm0rb - VST - Liminal Amp` folder into `/media/662522/Synths`.
-2. Put .nam captures in a `models` folder and .wav IRs in an `irs` folder: inside the plugin folder, or
-   anywhere on your cards (e.g. `/media/662522/models`).
-3. On the device: `sh /media/662522/Synths/vstscanner.sh`. MPC restarts; the plugin is under VST, manufacturer
-   "Gm0rb", as "Liminal Amp".
+1. On the MPC: **Preferences → Enhancements (Beta)**, turn on **Enable Enhancements** and **External Plugin Support**.
+2. Unzip, and copy the `Gm0rb - VST - Liminal Amp` folder into a folder named exactly **`VST2 Plugins`** at the root of a
+   USB drive, an SD card or the MPC's internal drive (create `VST2 Plugins` if needed).
+3. On a track: add an insert effect, **External Plugins → Liminal Amp**.
 
-Other firmware and the details: the release's README. The release also has a catalog zip
-(`Liminal-Amp-<version>-mpc-armv7.zip`, with `install.sh`) for the MPC OS Plugin Catalog; use one method per device.
-Your `models`, `irs` and `presets` folders are kept across upgrades.
+To update, replace the folder (keep your `models`, `irs` and `presets` folders if they're inside it) and re-add the plugin
+or restart the MPC. To remove it, delete the folder. Third-party plugins run inside the MPC application and inMusic doesn't
+support them: save often.
 
-**Gen 2 devices (MPC Live III and kin, RK3588 / RK3588S):** the release also has a 64-bit build,
-`Liminal-Amp-<version>-mpc-aarch64.zip` (the catalog's installer picks it on a Gen 2 device). Tested under emulation
-only so far: see [docs/GEN2.md](docs/GEN2.md).
+**Older, modded firmware (MPC OS 3.9.x):** `Liminal-Amp-<version>-mpc-armv7.zip` (Gen 1) or `-mpc-aarch64.zip` (Gen 2),
+with `install.sh`, or the MPC OS Plugin Catalog's Plugin Manager. These are the catalog's packages; their plugin folder
+carries the same `plugin.json`, so they work on 3.10.1 too.
+
+The 3.10.1 folder is checked with Akai's own tools from the
+[MPC Plugin SDK](https://github.com/inmusic-software/mpc-plugin-builder-sdk) on every build: `validate.py` (0 errors,
+0 warnings) and its host simulator `host_sim` on the PC and on both device binaries under emulation (`tools/akai_check.sh`).
 
 ### Want more?
 For a fuller amp rig, see [**NAM** by jacob-sabella](https://github.com/jacob-sabella/mpc-vst-nam), also in the
@@ -185,7 +190,7 @@ the amp, the cab and nothing else in the signal path, as close to the official p
 - `engine/ir_convolver.*`: the cabinet IR as uniformly partitioned FFT convolution (PFFFT, NEON on the device):
   the same result as the official plugin's direct convolution (checked against it: `tools/ir_test.cpp`) at a
   small fraction of the cost.
-- `engine/library.*`: finds `models`/`irs` folders in the plugin's folder and under `/media`, with POSIX
+- `engine/library.*`: finds `models`/`irs` folders in the plugin's folder and under `/media` and `/nvme`, with POSIX
   large-file directory calls (a 32-bit program's plain `readdir` and the C++ library's `std::filesystem` fail
   with EOVERFLOW on filesystems with 64-bit directory offsets), and keeps the quick-start index.
 - `engine/tone3000.*`, `engine/http.*`, `engine/pkce.*`: TONE3000's Select flow (OAuth 2.0 + PKCE) served to a
@@ -202,14 +207,16 @@ the amp, the cab and nothing else in the signal path, as close to the official p
 ```
 git clone https://github.com/sd88me/mpc-vst-plugins ../mpc-vst-plugins
 git -C ../mpc-vst-plugins checkout 3e50b052268d81e6c61a17a1390ced62f0fdff74   # as in .github/workflows/build.yml
-sudo apt install libeigen3-dev qemu-user libc6-armhf-cross
+sudo apt install libeigen3-dev qemu-user libc6-armhf-cross libc6-arm64-cross
 pip install ziglang==0.16.0 pillow playwright && python3 -m playwright install --with-deps chromium
 vst/build.sh              # the device plugin (armhf), its page and plugin-list entry
 vst/build.sh host         # the same plugin for this PC
 tools/test.sh             # library, IR vs the official convolver, engine, My Presets, plugin (with a TONE3000 mock)
 SANITIZE=asan tools/test.sh ; SANITIZE=tsan tools/test.sh   # memory and thread checks
-ARM=1 tools/test.sh       # also the device .so under qemu-arm (slow)
-REPO=<you>/mpc-vst-liminal-amp tools/package.sh   # release zips
+ARM=1 tools/test.sh       # also the device .so under qemu-arm (slow); ARM64=1: the Gen 2 .so under qemu-aarch64
+vst/build.sh aarch64      # the Gen 2 plugin (64-bit)
+MPC_VST_RELEASE=<newer mpc-vst-plugins> REPO=<you>/mpc-vst-liminal-amp tools/package.sh   # release zips (see build.yml)
+vst/build.sh zighost && AKAI_SDK=<mpc-plugin-builder-sdk> ARM=1 tools/akai_check.sh   # Akai's host_sim + validate.py
 ```
 Test inputs are generated (`tools/make_test_models.py`: A2-shaped models with random weights, synthetic IRs);
 no third-party captures are in the repository. CI runs all of the above on every push and makes a draft release

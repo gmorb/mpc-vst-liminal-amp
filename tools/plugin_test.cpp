@@ -251,6 +251,11 @@ int main(int argc, char** argv) {
     { void* ck = nullptr; intptr_t n = a->d(a, 23, 0, 0, &ck, 0); std::string t((const char*)ck, n);
       CHECK(t.find("amp_menu") == std::string::npos && t.find("cab_row") == std::string::npos && t.find("amp_title") == std::string::npos, "the lists are not part of the saved state");
       CHECK(a->d(a, 26, P_AMP_MENU, 0, nullptr, 0) == 0 && a->d(a, 26, P_CAB_ROW1, 0, nullptr, 0) == 0 && a->d(a, 26, P_INPUT, 0, nullptr, 0) == 1, "and not automatable"); }
+  // 1.1.0: buttons that act are not automatable (an automation lane can't press DELETE); sound controls are
+  CHECK(a->d(a, 26, P_MODEL_DELETE, 0, nullptr, 0) == 0 && a->d(a, 26, P_IR_DELETE, 0, nullptr, 0) == 0 &&
+        a->d(a, 26, P_RESCAN, 0, nullptr, 0) == 0 && a->d(a, 26, P_MODEL_BROWSE, 0, nullptr, 0) == 0 &&
+        a->d(a, 26, P_MODEL, 0, nullptr, 0) == 1 && a->d(a, 26, P_FULL, 0, nullptr, 0) == 1 && a->d(a, 26, P_TREBLE, 0, nullptr, 0) == 1,
+        "DELETE, RESCAN and BROWSE are not automatable; the capture, A2 FULL and the tone controls are");
     a->setP(a, P_AMP_MENU, 0.0f); a->setP(a, P_AMP_TITLE, 0.5f);
     CHECK(a->getP(a, P_AMP_MENU) == 0.5f, "the host can't set the open/closed state");
     press(a, P_AMP_CLOSE);
